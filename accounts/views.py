@@ -59,8 +59,12 @@ class UsersSearch(APIView):
             qs = qs.filter(profile__login__icontains=q)
         qs = qs.order_by("-profile__rating_elo","profile__login")[:50]
         items = [{
-            "id": u.id, "login": u.profile.login, "username": u.username,
-            "rating": u.profile.rating_elo, "wins": u.profile.wins, "losses": u.profile.losses
+            "id": u.id, 
+            "login": u.profile.login, 
+            "username": u.username,
+            "rating": u.profile.rating_elo, 
+            "wins": u.profile.wins, 
+            "losses": u.profile.losses
         } for u in qs]
         return Response({"items": items})
 

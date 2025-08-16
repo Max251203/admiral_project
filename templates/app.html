@@ -45,7 +45,7 @@
               <!-- ПРАВИЛА -->
               <div id="rulesContent" class="content-pane" style="display:none;">
                 <h2 class="text-center" style="margin-bottom:1rem; color:#80e4ff">Правила игры "Адмирал"</h2>
-                <div class="rules scroll">
+                <div class="rules">
                   <h3>Цель игры</h3>
                   <p>Уничтожить две военно-морские базы (ВМБ) противника или все его движущиеся фишки.</p>
                   
@@ -67,6 +67,9 @@
                   <p><strong>Воздушная атака:</strong> А + С (5 клеток вперед)</p>
                   <p><strong>Атомная бомба:</strong> АБ взрывается в квадрате 5×5</p>
                   <p><strong>Мины:</strong> М уничтожает атакующего (кроме ТР), СМ уничтожает всех</p>
+                  
+                  <h3>Победа</h3>
+                  <p>Игра заканчивается когда один из игроков уничтожает 2 ВМБ противника или все его движущиеся фишки, либо когда у игрока заканчивается время.</p>
                 </div>
               </div>
 
@@ -82,20 +85,17 @@
                 <div id="pane-quick" class="pane active">
                   <div class="lobbyContent">
                     <div class="settBox">
-                      <button id="quickBtn" class="menuButs sm">Найти случайного соперника</button>
-                      <span id="lobbyStatus" class="muted"></span>
-                    </div>
-                    
-                    <div class="settBox">
                       <label>Поиск игроков:</label>
                       <div class="search">
                         <input id="userSearch" placeholder="Поиск по никнейму...">
                         <button id="searchBtn" class="menuButs xs">Найти</button>
+                        <button id="quickBtn" class="menuButs xs">Случайный</button>
+                        <button id="showMeBtn" class="menuButs xs">Показать меня</button>
                       </div>
                     </div>
 
                     <div class="lists">
-                      <ul id="usersList" class="list scroll"></ul>
+                      <ul id="usersList" class="list"></ul>
                     </div>
                   </div>
                 </div>
@@ -104,7 +104,7 @@
                 <div id="pane-friends" class="pane">
                   <div class="lobbyContent">
                     <div class="lists">
-                      <ul id="friendsList" class="list scroll"></ul>
+                      <ul id="friendsList" class="list"></ul>
                     </div>
                   </div>
                 </div>
@@ -113,29 +113,47 @@
               <!-- ИГРА -->
               <div id="gameContent" class="content-pane" style="display:none;">
                 <div class="gameContent">
-                  <div class="hud">
-                    <div class="tag">Ход: <span id="hudTurn">--</span></div>
-                    <div class="tag">Таймер: <span id="hudTimer">--</span></div>
-                    <div class="tag">Банк: <span id="hudBank">--</span></div>
-                  </div>
-
-                  <div id="setupBar" class="settBox" style="display:none;">
-                    <button id="autoSetupBtn" class="menuButs xs">Автоматическая расстановка</button>
-                    <button id="readyBtn" class="menuButs xs">Готов</button>
-                  </div>
-
-                  <div class="settBox">
-                    <div class="tag">Режим:</div>
-                    <div style="display:flex; gap:.5rem; flex-wrap:wrap;">
-                      <button class="menuButs xs" data-mode="move">Ход</button>
-                      <button class="menuButs xs" data-mode="torpedo">Торпеда</button>
-                      <button class="menuButs xs" data-mode="air">Самолёт</button>
-                      <button class="menuButs xs" data-mode="bomb">Атомная</button>
-                      <button class="menuButs xs danger" id="resignBtn">Сдаться</button>
+                  <!-- HUD сверху -->
+                  <div class="game-hud">
+                    <div class="tag">
+                      <span id="turnIndicator">Ваш ход</span>
+                    </div>
+                    <div class="tag">Таймер: <span id="hudTimer">30s</span></div>
+                    <div class="tag">Банк: <span id="hudBank">15:00</span></div>
+                    <div class="tag">
+                      <button id="pauseBtn" class="menuButs xs">Пауза</button>
+                      <button id="resignBtn" class="menuButs xs danger">Сдаться</button>
                     </div>
                   </div>
 
-                  <div id="board" class="board"></div>
+                  <!-- Левая панель - корабли -->
+                  <div class="ships-panel">
+                    <h3>Корабли</h3>
+                    <div id="shipsContainer">
+                      <!-- Корабли будут добавлены через JS -->
+                    </div>
+                  </div>
+
+                  <!-- Игровое поле -->
+                  <div id="board" class="board">
+                    <!-- Клетки будут добавлены через JS -->
+                  </div>
+
+                  <!-- Правая панель - оружие -->
+                  <div class="weapons-panel">
+                    <h3>Оружие</h3>
+                    <div id="weaponsContainer">
+                      <div class="weapon-button" data-weapon="torpedo">
+                        <span>Т</span>
+                      </div>
+                      <div class="weapon-button" data-weapon="air">
+                        <span>С</span>
+                      </div>
+                      <div class="weapon-button" data-weapon="bomb">
+                        <span>АБ</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -250,12 +268,9 @@
     </div>
   </div>
 
-  <!-- Модалка приглашения -->
+  <!-- Модалка приглашения (без кнопки выхода) -->
   <div id="inviteModal" class="modal-backdrop">
     <div class="modal">
-      <div class="exit modal-close" data-target="inviteModal">
-        <div class="exit-in"><div class="exit-txt">ВЫХОД</div></div>
-      </div>
       <h3 id="inviteText" class="modalTitle">Приглашение в игру</h3>
       <div class="btnRow">
         <button id="inviteAccept" class="menuButs xs">Принять</button>
@@ -270,6 +285,34 @@
       <div id="waitText" class="modalTitle">Ожидание...</div>
       <div class="btnRow">
         <button id="waitCancel" class="menuButs xs danger">Отменить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка результата игры -->
+  <div id="gameResultModal" class="modal-backdrop">
+    <div class="modal game-result-modal">
+      <div class="exit" id="gameResultExit">
+        <div class="exit-in"><div class="exit-txt">ВЫХОД</div></div>
+      </div>
+      <h2 id="resultTitle" class="result-title">Победа!</h2>
+      <div id="resultDetails" class="result-details">
+        <p>Поздравляем с победой!</p>
+      </div>
+      <div id="ratingChange" class="rating-change">
+        Рейтинг: +100 очков
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка паузы -->
+  <div id="pauseModal" class="modal-backdrop">
+    <div class="modal">
+      <h3 class="modalTitle">Пауза</h3>
+      <div class="btnRow">
+        <button id="shortPauseBtn" class="menuButs xs">Короткая (1 мин)</button>
+        <button id="longPauseBtn" class="menuButs xs">Длинная (3 мин)</button>
+        <button id="cancelPauseBtn" class="menuButs xs danger">Отмена</button>
       </div>
     </div>
   </div>
