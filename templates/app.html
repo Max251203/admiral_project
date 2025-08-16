@@ -9,14 +9,15 @@
 </head>
 <body data-auth="{{ request.user.is_authenticated|yesno:'1,0' }}"
       data-login="{% if request.user.is_authenticated %}{{ request.user.profile.login }}{% endif %}"
-      data-avatar="{% if request.user.is_authenticated and request.user.profile.avatar %}{{ request.user.profile.avatar.url }}{% else %}{% static 'img/avatar_stub.png' %}{% endif %}">
+      data-avatar="{% if request.user.is_authenticated %}{{ request.user.profile.get_avatar_url }}{% else %}{% static 'img/avatar_stub.png' %}{% endif %}">
 
   <main class="flex-center">
-    <!-- Главная карточка (меню <-> панель) -->
-    <div id="msContainer" class="front-back front">
-      <!-- Лицевая сторона: МЕНЮ -->
-      <section id="menu" class="front-back front">
-        <div class="glass flex-center">
+    <!-- Контейнер как в игре-примере -->
+    <div id="msWrap" class="front-back front flex-center">
+      <div id="msContainer" class="flex-center">
+        
+        <!-- МЕНЮ -->
+        <div id="menu" class="front-back front">
           <!-- Профиль справа сверху -->
           <div id="topRight">
             <button id="profileBtn" class="profile-btn">
@@ -25,107 +26,137 @@
             </button>
           </div>
 
-          <!-- Логотип как в демо -->
-          <h1 id="menuHead" data-shadow="АДМИРАЛ">АДМИРАЛ</h1>
-
-          <div class="menuGroup">
-            <button id="startBut" type="button" class="menuButs">ИГРАТЬ</button>
-            <button id="rulesBut" type="button" class="menuButs sm">ПРАВИЛА</button>
-          </div>
+          <!-- Логотип и кнопки -->
+          <h1 id="menuHead" class="menu-font" data-shadow="АДМИРАЛ">АДМИРАЛ</h1>
+          <button id="startBut" type="button" class="menuButs menu-font">ИГРАТЬ</button>
+          <button id="rulesBut" type="button" class="menuButs menu-font">ПРАВИЛА</button>
         </div>
-      </section>
 
-      <!-- Обратная сторона: ПАНЕЛЬ (Лобби/Правила) -->
-      <section id="panel" class="front-back back">
-        <div class="glass">
-          <!-- крестик назад в меню -->
-          <div class="exit" id="panelExit"><div class="exit-in"><div class="exit-txt">ВЫХОД</div></div></div>
-
-          <!-- Табы панели как widget -->
-          <div class="tabbar">
-            <button class="tab active" data-pane="pane-lobby">Лобби</button>
-            <button class="tab" data-pane="pane-rules">Правила</button>
-          </div>
-
-          <!-- Панель: ЛОББИ -->
-          <div id="pane-lobby" class="pane active">
-            <div class="settBox gb1">
-              <button id="quickBtn" class="menuButs sm">Найти случайного соперника</button>
-              <span id="lobbyStatus" class="muted"></span>
+        <!-- НАСТРОЙКИ (используем для лобби/правил/игры) -->
+        <div id="settings" class="front-back back">
+          <div class="card-inner">
+            <div class="exit" id="settExit">
+              <div class="exit-in"><div class="exit-txt">ВЫХОД</div></div>
             </div>
 
-            <!-- Внутренние вкладки: Все / Друзья -->
-            <div class="tabbar sub">
-              <button class="tab small active" data-sub="users">Все</button>
-              <button class="tab small" data-sub="friends">Друзья</button>
-              <div class="search">
-                <input id="userSearch" placeholder="Поиск по никнейму...">
-                <button id="searchBtn" class="menuButs xs">Найти</button>
-              </div>
-            </div>
-
-            <div class="lists">
-              <ul id="usersList" class="list scroll"></ul>
-              <ul id="friendsList" class="list scroll" style="display:none;"></ul>
-            </div>
-          </div>
-
-          <!-- Панель: ПРАВИЛА (на всю карточку, без рамок) -->
-          <div id="pane-rules" class="pane" style="display:none;">
-            <div class="rules">
-              <h2>Правила</h2>
-              <p>Поле 15×14, разделено на 3 зоны. Цель: уничтожить 2 ВМБ противника или все его движущиеся фишки.</p>
-              <p>Ходы по очереди: 30 сек на ход, банк времени 15 мин (при превышении хода списывается из банка). 2 паузы на партию (3 мин и 1 мин).</p>
-              <p>Группы: до 3 однотипных, по силе — по рейтингу (исключения: ПЛ против БДК/А; КРПЛ против КР).</p>
-              <p>Особые атаки: торпедный выстрел (ТК+Т), воздушная атака (А+С), атомная бомба (АБ 5×5, детонация), мины/стационарные мины, танкер.</p>
-              <p>Аббревиатуры на поле: БДК, КР, А, С, ТН, Л, ЭС, М, СМ, Ф, ТК, Т, ТР, СТ, ПЛ, КРПЛ, АБ, ВМБ.</p>
-            </div>
-          </div>
-
-          <!-- ИГРОВОЕ ОКНО (оверлей) — fade/появление, без переворота -->
-          <div id="gameWrap" class="overlay hide">
-            <div id="gameBox" class="gb2">
-              <div class="exit" id="gameExit"><div class="exit-in"><div class="exit-txt">ВЫХОД</div></div></div>
-
-              <div class="hud">
-                <div class="tag">Ход: <span id="hudTurn">--</span></div>
-                <div class="tag">Таймер: <span id="hudTimer">--</span></div>
-                <div class="tag">Банк: <span id="hudBank">--</span></div>
-              </div>
-
-              <div id="setupBar" class="settBox gb4" style="display:none;">
-                <button id="autoSetupBtn" class="menuButs xs">Сгенерировать расстановку</button>
-                <button id="readyBtn" class="menuButs xs">Готов</button>
-              </div>
-
-              <div class="settBox gb3">
-                <div class="tag">Режим:</div>
-                <div class="modeBtns">
-                  <button class="menuButs xs" data-mode="move">Ход</button>
-                  <button class="menuButs xs" data-mode="torpedo">Торпеда</button>
-                  <button class="menuButs xs" data-mode="air">Самолёт</button>
-                  <button class="menuButs xs" data-mode="bomb">Атомная</button>
-                  <button class="menuButs xs danger" id="resignBtn">Сдаться</button>
+            <!-- Контент настроек -->
+            <div id="settingsContent" style="width:100%; height:100%; display:flex; flex-direction:column;">
+              
+              <!-- ПРАВИЛА -->
+              <div id="rulesContent" class="content-pane" style="display:none;">
+                <h2 class="text-center" style="margin-bottom:1rem; color:#80e4ff">Правила игры "Адмирал"</h2>
+                <div class="rules scroll">
+                  <h3>Цель игры</h3>
+                  <p>Уничтожить две военно-морские базы (ВМБ) противника или все его движущиеся фишки.</p>
+                  
+                  <h3>Подготовка</h3>
+                  <p>Поле 15×14 клеток, разделено на 3 зоны красными линиями. Каждый игрок размещает 61 фишку в своей зоне (5×14 клеток) за 15 минут.</p>
+                  
+                  <h3>Состав флота</h3>
+                  <p><strong>БДК</strong> (2), <strong>КР</strong> (6), <strong>А</strong> (1), <strong>С</strong> (1), <strong>ТН</strong> (1), <strong>Л</strong> (2), <strong>ЭС</strong> (6), <strong>М</strong> (6), <strong>СМ</strong> (1), <strong>Ф</strong> (6), <strong>ТК</strong> (6), <strong>Т</strong> (6), <strong>ТР</strong> (6), <strong>СТ</strong> (6), <strong>ПЛ</strong> (1), <strong>КРПЛ</strong> (1), <strong>АБ</strong> (1), <strong>ВМБ</strong> (2)</p>
+                  
+                  <h3>Ходы и время</h3>
+                  <p>Игроки ходят по очереди. На каждый ход — 30 секунд. Общий банк времени — 15 минут. При превышении хода время списывается из банка.</p>
+                  
+                  <h3>Группы и атаки</h3>
+                  <p>Корабли могут объединяться в группы до 3 единиц. Сила группы = сумма рейтингов кораблей.</p>
+                  <p><strong>Особые правила:</strong> ПЛ уничтожает БДК и А; КРПЛ уничтожает КР.</p>
+                  
+                  <h3>Специальные атаки</h3>
+                  <p><strong>Торпедный выстрел:</strong> ТК + Т (7 направлений)</p>
+                  <p><strong>Воздушная атака:</strong> А + С (5 клеток вперед)</p>
+                  <p><strong>Атомная бомба:</strong> АБ взрывается в квадрате 5×5</p>
+                  <p><strong>Мины:</strong> М уничтожает атакующего (кроме ТР), СМ уничтожает всех</p>
                 </div>
               </div>
 
-              <div id="board" class="board"></div>
+              <!-- ЛОББИ -->
+              <div id="lobbyContent" class="content-pane" style="display:none;">
+                <!-- Табы -->
+                <div class="tabbar">
+                  <button class="tab active" data-pane="pane-quick">Быстрая игра</button>
+                  <button class="tab" data-pane="pane-friends">Друзья</button>
+                </div>
+
+                <!-- Быстрая игра -->
+                <div id="pane-quick" class="pane active">
+                  <div class="lobbyContent">
+                    <div class="settBox">
+                      <button id="quickBtn" class="menuButs sm">Найти случайного соперника</button>
+                      <span id="lobbyStatus" class="muted"></span>
+                    </div>
+                    
+                    <div class="settBox">
+                      <label>Поиск игроков:</label>
+                      <div class="search">
+                        <input id="userSearch" placeholder="Поиск по никнейму...">
+                        <button id="searchBtn" class="menuButs xs">Найти</button>
+                      </div>
+                    </div>
+
+                    <div class="lists">
+                      <ul id="usersList" class="list scroll"></ul>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Друзья -->
+                <div id="pane-friends" class="pane">
+                  <div class="lobbyContent">
+                    <div class="lists">
+                      <ul id="friendsList" class="list scroll"></ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ИГРА -->
+              <div id="gameContent" class="content-pane" style="display:none;">
+                <div class="gameContent">
+                  <div class="hud">
+                    <div class="tag">Ход: <span id="hudTurn">--</span></div>
+                    <div class="tag">Таймер: <span id="hudTimer">--</span></div>
+                    <div class="tag">Банк: <span id="hudBank">--</span></div>
+                  </div>
+
+                  <div id="setupBar" class="settBox" style="display:none;">
+                    <button id="autoSetupBtn" class="menuButs xs">Автоматическая расстановка</button>
+                    <button id="readyBtn" class="menuButs xs">Готов</button>
+                  </div>
+
+                  <div class="settBox">
+                    <div class="tag">Режим:</div>
+                    <div style="display:flex; gap:.5rem; flex-wrap:wrap;">
+                      <button class="menuButs xs" data-mode="move">Ход</button>
+                      <button class="menuButs xs" data-mode="torpedo">Торпеда</button>
+                      <button class="menuButs xs" data-mode="air">Самолёт</button>
+                      <button class="menuButs xs" data-mode="bomb">Атомная</button>
+                      <button class="menuButs xs danger" id="resignBtn">Сдаться</button>
+                    </div>
+                  </div>
+
+                  <div id="board" class="board"></div>
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
-      </section>
+      </div>
     </div>
   </main>
 
   <!-- Модалка профиля -->
   <div id="profileModal" class="modal-backdrop">
     <div class="modal">
-      <div class="exit modal-close" data-target="profileModal"><div class="exit-in"><div class="exit-txt">ВЫХОД</div></div></div>
+      <div class="exit modal-close" data-target="profileModal">
+        <div class="exit-in"><div class="exit-txt">ВЫХОД</div></div>
+      </div>
+      
       <h2 class="modalTitle">Профиль</h2>
 
-      <!-- Аватар сверху с предпросмотром -->
       <div class="avatarBox">
-        <img id="pAvatarPreview" class="avatarLarge" src="{% if request.user.is_authenticated and request.user.profile.avatar %}{{ request.user.profile.avatar.url }}{% else %}{% static 'img/avatar_stub.png' %}{% endif %}" alt="avatar">
+        <img id="pAvatarPreview" class="avatarLarge" src="{% static 'img/avatar_stub.png' %}" alt="avatar">
         <label for="pAvatar" class="menuButs xs">Сменить аватар</label>
         <input id="pAvatar" type="file" accept="image/*" style="display:none;">
       </div>
@@ -137,23 +168,41 @@
 
       <div id="p-info" class="pane active">
         <form id="profileForm" enctype="multipart/form-data">
-          <div class="form-row"><label>Никнейм</label><input name="login" id="pLogin" required></div>
-          <div class="form-row"><label>Username</label><input name="username" id="pUsername" required></div>
-          <div class="form-row"><label>Email</label><input name="email" id="pEmail" type="email"></div>
-          <div class="form-row right"><button class="menuButs xs" type="submit">Сохранить</button></div>
+          <div class="form-row">
+            <label>Никнейм</label>
+            <input name="login" id="pLogin" required>
+          </div>
+          <div class="form-row">
+            <label>Username</label>
+            <input name="username" id="pUsername" required>
+          </div>
+          <div class="form-row">
+            <label>Email</label>
+            <input name="email" id="pEmail" type="email">
+          </div>
+          <div class="btnRow">
+            <button class="menuButs xs" type="submit">Сохранить</button>
+          </div>
         </form>
       </div>
 
-      <div id="p-history" class="pane" style="display:none;">
-        <ul id="historyList" class="list scroll slim"></ul>
+      <div id="p-history" class="pane">
+        <div class="history-container">
+          <ul id="historyList" class="history-list"></ul>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Модалка вход/регистрация -->
+  <!-- Модалка авторизации -->
   <div id="authModal" class="modal-backdrop">
     <div class="modal">
-      <div class="exit modal-close" data-target="authModal"><div class="exit-in"><div class="exit-txt">ВЫХОД</div></div></div>
+      <div class="exit modal-close" data-target="authModal">
+        <div class="exit-in"><div class="exit-txt">ВЫХОД</div></div>
+      </div>
+      
+      <h2 class="modalTitle">Авторизация</h2>
+      
       <div class="tabbar">
         <button class="tab active" data-pane="a-login">Вход</button>
         <button class="tab" data-pane="a-register">Регистрация</button>
@@ -161,29 +210,53 @@
 
       <div id="a-login" class="pane active">
         <form id="loginForm">
-          <div class="form-row"><label>Username</label><input name="username" required autocomplete="username"></div>
-          <div class="form-row"><label>Пароль</label><input name="password" type="password" required autocomplete="current-password"></div>
-          <div class="form-row right"><button class="menuButs xs" type="submit">Войти</button></div>
+          <div class="form-row">
+            <label>Username</label>
+            <input name="username" required>
+          </div>
+          <div class="form-row">
+            <label>Пароль</label>
+            <input name="password" type="password" required>
+          </div>
+          <div class="btnRow">
+            <button class="menuButs xs" type="submit">Войти</button>
+          </div>
         </form>
       </div>
 
-      <div id="a-register" class="pane" style="display:none;">
+      <div id="a-register" class="pane">
         <form id="registerForm">
-          <div class="form-row"><label>Username</label><input name="username" required></div>
-          <div class="form-row"><label>Email</label><input name="email" type="email"></div>
-          <div class="form-row"><label>Никнейм (в игре)</label><input name="login" required></div>
-          <div class="form-row"><label>Пароль</label><input name="password" type="password" required autocomplete="new-password"></div>
-          <div class="form-row right"><button class="menuButs xs" type="submit">Зарегистрироваться</button></div>
+          <div class="form-row">
+            <label>Username</label>
+            <input name="username" required>
+          </div>
+          <div class="form-row">
+            <label>Email</label>
+            <input name="email" type="email">
+          </div>
+          <div class="form-row">
+            <label>Никнейм</label>
+            <input name="login" required>
+          </div>
+          <div class="form-row">
+            <label>Пароль</label>
+            <input name="password" type="password" required>
+          </div>
+          <div class="btnRow">
+            <button class="menuButs xs" type="submit">Зарегистрироваться</button>
+          </div>
         </form>
       </div>
     </div>
   </div>
 
-  <!-- Кастомная модалка приглашения -->
+  <!-- Модалка приглашения -->
   <div id="inviteModal" class="modal-backdrop">
-    <div class="modal center">
-      <div class="exit modal-close" data-target="inviteModal"><div class="exit-in"><div class="exit-txt">ВЫХОД</div></div></div>
-      <h3 id="inviteText">Приглашение в игру</h3>
+    <div class="modal">
+      <div class="exit modal-close" data-target="inviteModal">
+        <div class="exit-in"><div class="exit-txt">ВЫХОД</div></div>
+      </div>
+      <h3 id="inviteText" class="modalTitle">Приглашение в игру</h3>
       <div class="btnRow">
         <button id="inviteAccept" class="menuButs xs">Принять</button>
         <button id="inviteDecline" class="menuButs xs danger">Отклонить</button>
@@ -192,11 +265,12 @@
   </div>
 
   <!-- Модалка ожидания -->
-  <div id="wait" class="modal-backdrop">
-    <div class="modal center">
-      <div class="spinner big"></div>
-      <div id="waitText" class="waitText">Ожидание...</div>
-      <div class="btnRow"><button id="waitCancel" class="menuButs xs danger">Отменить</button></div>
+  <div id="waitModal" class="modal-backdrop">
+    <div class="modal">
+      <div id="waitText" class="modalTitle">Ожидание...</div>
+      <div class="btnRow">
+        <button id="waitCancel" class="menuButs xs danger">Отменить</button>
+      </div>
     </div>
   </div>
 

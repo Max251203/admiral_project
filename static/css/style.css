@@ -1,25 +1,30 @@
-/* === Базовая типографика из демо === */
 @font-face{
   font-family:Boomboom;
   src:url('/static/fonts/Boomboom.otf');
 }
+
+/* Базовые стили */
 *{
   margin:0; padding:0; text-decoration:none;
   -webkit-box-sizing:border-box; box-sizing:border-box;
-  text-align:center; font-family:Boomboom;
 }
 *, *:before, *:after{
   margin:0; padding:0; box-sizing:border-box; -webkit-box-sizing:border-box;
   position:relative;
 }
+
 html,body{height:100%; width:100%;}
 body{
   background: repeating-linear-gradient(45deg,#000000,#000000 0.5vw,#1a1a1a 0vw,#1a1a1a 1vw);
-  color:#fff; overflow:hidden; /* без вертикального скролла */
+  color:#fff; overflow:hidden; font-family: Arial, sans-serif;
 }
+
+/* Только для меню используем Boomboom */
+.menu-font { font-family: Boomboom; text-align: center; }
+
 .flex-center{display:flex; justify-content:center; align-items:center}
 
-/* Визуальные классы из демо */
+/* Визуальные классы */
 .cl1{color:#ff5e2c;border-color:#ff5e2c}
 .cl2{color:#8155a6;border-color:#8155a6}
 .cl3{color:#27e881;border-color:#27e881}
@@ -33,7 +38,7 @@ body{
 .gb3{background: repeating-radial-gradient(circle at 0 100%, rgba(30,30,30,.1), rgba(39,232,129,.15) 2px, rgba(125,125,125,.2) 3px, rgba(39,232,129,.15) 4px, rgba(30,30,30,.1) 5px),radial-gradient(circle at 0 100%, #000, #050505, #101010, #151515, #202020)}
 .gb4{background: repeating-radial-gradient(circle at 0 100%, rgba(30,30,30,.1), rgba(128,227,255,.15) 2px, rgba(125,125,125,.2) 3px, rgba(128,227,255,.15) 4px, rgba(30,30,30,.1) 5px),radial-gradient(circle at 0 100%, #000, #050505, #101010, #151515, #202020)}
 
-/* Основная сцена (как в демо main) */
+/* Основная сцена */
 main{
   position:relative; height:98%; width:90%;
   margin:1% auto;
@@ -43,34 +48,79 @@ main{
   -webkit-perspective:200vw; perspective:200vw;
 }
 
-/* === flip-система из демо === */
+/* Контейнер карточек - точно как в игре-примере */
+#msWrap{
+  height:90%; width:50%;
+  display:flex; justify-content:center; align-items:center;
+}
+
+#msContainer{
+  position:relative; height:100%; width:100%;
+  overflow:hidden;
+  -webkit-transform-style:preserve-3d; transform-style:preserve-3d;
+  -webkit-perspective:100vw; perspective:100vw;
+}
+
+/* Карточки - точно как в примере */
+#menu, #settings{
+  height:100%; width:100%; color:#ffffff;
+  position:absolute; display:flex; flex-direction:column; 
+  align-items:center; justify-content:space-evenly; z-index:0;
+  -webkit-backface-visibility:hidden; backface-visibility:hidden;
+  -webkit-transition:opacity 1.5s, visibility 1.5s, transform 2s;
+  transition:opacity 1.5s, visibility 1.5s, transform 2s;
+  border:0.15vw outset #ffffff; border-radius:2.5vw;
+}
+
+/* Система переворачивания как в примере */
 .front-back{
-  position:absolute; inset:0;
-  display:flex; flex-direction:column; align-items:center; justify-content:space-evenly;
-  z-index:0;
+  position:absolute; display:flex; flex-direction:column; 
+  align-items:center; justify-content:space-evenly; z-index:0;
   -webkit-backface-visibility:hidden; backface-visibility:hidden;
   -webkit-transition:opacity 1.5s, visibility 1.5s, transform 2s;
   transition:opacity 1.5s, visibility 1.5s, transform 2s;
 }
-.front{ opacity:1; visibility:visible; transform:rotateY(0deg) }
-.back{  opacity:0; visibility:hidden;  transform:rotateY(180deg) }
-.flip .front{ opacity:0; visibility:hidden; transform:rotateY(-180deg) }
-.flip .back{  opacity:1; visibility:visible; transform:rotateY(0deg) }
 
-/* Внутренний блок (без серебристой рамки) */
-.glass{
-  width:min(1200px,95%); height:90%;
-  border-radius:2.5vw; padding:1.2vw;
-  display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
-  gap:1rem;
+.front{ 
+  opacity:1; visibility:visible; 
+  transform:rotateY(0deg);
+}
+.back{  
+  opacity:0; visibility:hidden;  
+  transform:rotateY(180deg);
+}
+.flip .front{ 
+  opacity:0; visibility:hidden; 
+  transform:rotateY(-180deg);
+}
+.flip .back{  
+  opacity:1; visibility:visible; 
+  transform:rotateY(0deg);
 }
 
-/* Заголовок как в демо */
+/* Фоны карточек */
+#menu{
+  background: linear-gradient(45deg, #ff5e2c, #8155a6), rgba(0,0,0,.8);
+  background-blend-mode: overlay;
+}
+
+#settings{ 
+  background: linear-gradient(315deg,#4dff03,#00d0ff);
+}
+
+/* Внутренние контейнеры для карточек с затемнением - вплотную к родителю */
+.card-inner{
+  width:calc(100% - 0.3vw); height:calc(100% - 0.3vw); 
+  background:rgba(0,0,0,.8); border-radius:2.2vw;
+  display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+  padding:1.5rem; overflow:hidden; margin:0.15vw;
+}
+
+/* Заголовок меню */
 #menuHead{
   letter-spacing:.6vw; display:inline-block; font-size:8vw;
   text-shadow:.03em .03em 0 #000;
   color:#ff5e2c;
-  margin-top:6vh;
 }
 #menuHead:after{
   content:attr(data-shadow);
@@ -80,149 +130,316 @@ main{
   -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
   animation: shad-anim 15s linear infinite;
 }
-@keyframes shad-anim{0%{background-position:0 0}100%{background-position:100% -100%}}
+@keyframes shad-anim{
+  0%{background-position:0 0}
+  100%{background-position:100% -100%}
+}
 
-/* Кнопки меню из демо */
+/* Кнопки меню */
 .menuButs{
   background:rgba(0,0,0,0); color:#fff;
   border:.15vw outset #ffffff; border-radius:2.5vw;
-  cursor:pointer; height:auto; padding:.8rem 1.6rem;
-  font-size:2vw;
+  cursor:pointer; height:20%; width:64%; font-size:2vw;
 }
-.menuButs.sm{ font-size:1.2vw; padding:.5rem 1.2rem }
-.menuButs.xs{ font-size:1rem; padding:.35rem .9rem; border-radius:1.3rem }
-.menuButs.danger{ border-color:#c23b3b; color:#ffb3b3 }
-.menuGroup{ display:flex; flex-direction:column; gap:1.1rem; align-items:center; margin-top:4vh }
+.menuButs.sm{ 
+  font-size:1.2vw; padding:.6rem 1.2rem; height:auto; width:auto; margin:0.3rem;
+}
+.menuButs.xs{ 
+  font-size:0.9vw; padding:.4rem .8rem; border-radius:1.3rem; height:auto; width:auto; margin:0.2rem;
+}
+.menuButs.danger{ border-color:#c23b3b; color:#ffb3b3; }
+.menuButs.clear{ background:transparent; border:none; }
+
+/* Крестик - как в примере */
+.exit{
+  position:absolute; top:1vw; right:1vw; height:3vw; width:3vw; cursor:pointer; z-index:10;
+}
+.exit-in{ width:inherit; text-align:center; }
+.exit-txt{
+  font-size:0.8vw; line-height:3vw; text-transform:uppercase; 
+  transition:all .2s ease-in; opacity:0; cursor:pointer;
+}
+.exit-in:before, .exit-in:after{
+  position:absolute; content:''; height:.1vw; width:inherit; left:0; 
+  background:#fff; transition:all .2s ease-in;
+}
+.exit-in:before{ top:calc(50% - .1vw); transform:rotate(45deg); }
+.exit-in:after{ bottom:50%; transform:rotate(-45deg); }
+.exit:hover .exit-txt{opacity:1;}
+.exit:hover .exit-in:before, .exit:hover .exit-in:after{ transform:rotate(0); }
+.exit:hover .exit-in:before{ top:0; }
+.exit:hover .exit-in:after{ bottom:0; }
 
 /* Профиль справа сверху */
-#topRight{ position:absolute; top:1vw; right:1vw }
-.profile-btn{display:flex;align-items:center;gap:.6rem;background:transparent;border:.12vw solid #fff;border-radius:2rem;padding:.35rem .8rem;color:#fff;cursor:pointer}
-.avatar{width:30px;height:30px;border-radius:50%;object-fit:cover;border:2px solid #fff}
-#profileName{font-weight:800}
-
-/* Крестик из демо (уменьшил шрифт, чтобы не выходил за линии) */
-.exit{ position:absolute; top:1vw; right:1vw; height:3vw; width:3vw; cursor:pointer }
-.exit-in{ width:inherit; text-align:center }
-.exit-txt{ font-size:.9vw; line-height:3vw; text-transform:uppercase; transition:.2s; opacity:0; cursor:pointer }
-.exit-in:before, .exit-in:after{
-  position:absolute; content:''; height:.12vw; width:inherit; left:0; background:#fff; transition:.2s
+#topRight{ position:absolute; top:1vw; right:1vw; z-index:10; }
+.profile-btn{
+  display:flex; align-items:center; gap:.6rem; background:transparent;
+  border:.12vw solid #fff; border-radius:2rem; padding:.35rem .8rem;
+  color:#fff; cursor:pointer; font-family:Arial, sans-serif;
 }
-.exit-in:before{ top:calc(50% - .06vw); transform:rotate(45deg) }
-.exit-in:after{ bottom:50%; transform:rotate(-45deg) }
-.exit:hover .exit-txt{opacity:1}
-.exit:hover .exit-in:before, .exit:hover .exit-in:after{ transform:rotate(0) }
-.exit:hover .exit-in:before{ top:0 } .exit:hover .exit-in:after{ bottom:0 }
+.avatar{ width:30px; height:30px; border-radius:50%; object-fit:cover; border:2px solid #fff; }
+#profileName{ font-weight:normal; }
 
-/* Табы как widget (PyQt-style) */
-.tabbar{ display:flex; gap:.6rem; align-items:center; justify-content:flex-start; width:100%; margin:.4rem 0 }
-.tabbar.sub{ margin-top:.8rem }
-.tab{ background:transparent; border:.12vw solid #fff; border-radius:1.2rem; padding:.35rem .9rem; color:#fff; cursor:pointer }
-.tab.small{ font-size:1rem }
-.tab.active{ background:rgba(255,255,255,.08) }
+/* Табы */
+.tabbar{
+  display:flex; gap:.6rem; align-items:center; justify-content:center; 
+  width:100%; margin:1rem 0; z-index:5;
+}
+.tab{
+  background:transparent; border:.12vw solid #fff; border-radius:1.2rem; 
+  padding:.5rem 1rem; color:#fff; cursor:pointer; font-size:1rem;
+  transition:all .3s;
+}
+.tab.active{ background:rgba(255,255,255,.2); border-color:#80e4ff; }
+.tab:hover{ background:rgba(255,255,255,.1); }
 
-.pane{ width:100%; }
-.pane.active{ display:block }
+/* Контент карточек */
+.card-content{
+  width:100%; height:100%; display:flex; flex-direction:column; align-items:center;
+  overflow:hidden;
+}
 
-/* Поиск и списки */
-.search{ margin-left:auto; display:flex; gap:.4rem; align-items:center }
+.content-pane{
+  width:100%; height:100%; display:flex; flex-direction:column; align-items:center;
+}
+
+/* Правила */
+.rules{
+  text-align:left; padding:1rem; height:100%; overflow-y:auto; 
+  border:.12vw solid #fff; border-radius:1rem; background:rgba(0,0,0,.3); 
+  width:100%; margin-top:1rem;
+}
+.rules h2{ margin-bottom:1rem; color:#80e4ff; }
+.rules h3{ margin:1rem 0 0.5rem 0; color:#27e881; }
+.rules p{ margin-bottom:0.8rem; line-height:1.4; }
+
+/* Лобби */
+.lobbyContent{
+  width:100%; height:100%; display:flex; flex-direction:column; gap:1rem; 
+  align-items:center; padding-top:1rem;
+}
+.settBox{
+  display:flex; align-items:center; justify-content:space-between;
+  width:100%; padding:.8rem; border:.12vw solid #80e4ff; border-radius:1.5rem;
+  background:rgba(0,0,0,.3); gap:1rem;
+}
+
+/* Поиск */
+.search{ display:flex; gap:.4rem; align-items:center; }
 .search input{
-  padding:.45rem .7rem; border:.12vw solid #fff; border-radius:1rem;
-  background:rgba(0,0,0,.55); color:#fff; min-width:240px; text-align:left
+  padding:.5rem .7rem; border:.12vw solid #fff; border-radius:1rem;
+  background:rgba(0,0,0,.55); color:#fff; min-width:200px; font-family:Arial, sans-serif;
 }
-.lists{ width:100%; margin-top:.6rem; display:block }
+
+/* Списки */
+.lists{ width:100%; flex:1; overflow:hidden; margin-top:1rem; }
 .list{
   list-style:none; margin:0; padding:0;
   border:.12vw solid #fff; border-radius:1rem;
-  background:rgba(0,0,0,.5); max-height:50vh; overflow:auto; text-align:left
+  background:rgba(0,0,0,.5); height:100%; overflow-y:auto;
 }
 .list li{
   display:flex; align-items:center; justify-content:space-between;
-  padding:.6rem .9rem; border-bottom:1px solid rgba(255,255,255,.08)
+  padding:.8rem; border-bottom:1px solid rgba(255,255,255,.08);
 }
-.list li:last-child{ border-bottom:none }
+.list li:last-child{ border-bottom:none; }
+.list li:hover{ background:rgba(255,255,255,.05); }
 
-/* Правила на всю карточку, без рамок внутри */
-.rules{ text-align:left; padding:1rem; max-height:58vh; overflow:auto; }
-
-/* Оверлей игры (fade) */
-.overlay{
-  position:absolute; inset:0;
-  display:flex; align-items:center; justify-content:center;
-  opacity:1; visibility:visible; transition:opacity .6s ease, visibility .6s ease;
+.pane{
+  width:100%; display:none; flex-direction:column;
 }
-.overlay.hide{ opacity:0; visibility:hidden }
-#gameBox{
-  position:relative; width:96%; height:92%;
-  border-radius:2.5vw; padding:1vw; display:flex; flex-direction:column; gap:.6rem; align-items:center
+.pane.active{ display:flex; }
+
+/* Игровое поле */
+.gameContent{
+  width:100%; height:100%; display:flex; flex-direction:column; gap:.8rem; 
+  align-items:center; padding-top:1rem;
 }
-
-/* HUD */
-.hud{ width:100%; display:flex; gap:.6rem; flex-wrap:wrap; justify-content:flex-start }
-.tag{ display:inline-block; padding:.25rem .6rem; border:.12vw solid #fff; border-radius:.9rem; background:rgba(0,0,0,.45) }
-
-/* Панели управления (как "настройки" в демо) */
-.settBox{
-  display:flex; align-items:center; justify-content:space-evenly;
-  width:100%; padding:.5rem; border-radius:2.5vw;
+.hud{ 
+  width:100%; display:flex; gap:.6rem; flex-wrap:wrap; justify-content:center;
+  margin-bottom:.5rem;
+}
+.tag{ 
+  display:inline-block; padding:.3rem .6rem; border:.12vw solid #fff; 
+  border-radius:.9rem; background:rgba(0,0,0,.45); font-size:.9rem;
 }
 
-/* Игровое поле 15x14 */
 .board{
-  width:min(95vw,960px); aspect-ratio:14/15;
-  display:grid; gap:2px;
+  width:min(60vh,60vw); aspect-ratio:14/15;
+  display:grid; gap:1px;
   grid-template-columns:repeat(14,1fr); grid-template-rows:repeat(15,1fr);
-  margin:.6rem auto; border:2px solid #fff; border-radius:1.2rem; overflow:hidden;
-  background: radial-gradient(circle at 0 100%, #000, #050505, #101010, #151515, #202020);
+  border:.12vw solid #80e4ff; border-radius:1.2rem; overflow:hidden;
+  background: linear-gradient(315deg,#4dff03,#00d0ff);
+  flex-shrink:0;
 }
-.board .cell{ background:rgba(8,70,104,.66); display:flex; align-items:center; justify-content:center }
-.board .piece{ width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-weight:800; letter-spacing:.5px }
+.board .cell{
+  background:rgba(8,70,104,.66); display:flex; align-items:center; justify-content:center;
+  cursor:pointer; 
+  -webkit-transition:background .2s;
+  -moz-transition:background .2s;
+  -ms-transition:background .2s;
+  -o-transition:background .2s;
+  transition:background .2s;
+}
+.board .cell:hover{ background:rgba(8,70,104,.8); }
+.board .cell.selected{ background:rgba(255,255,0,.5); }
+.board .piece{
+  width:100%; height:100%; display:flex; align-items:center; justify-content:center;
+  font-weight:800; letter-spacing:.5px; font-size:clamp(6px,1vw,12px);
+}
 
-/* Цвета фигур + русские аббревиатуры рисуются текстом, цвет через классы */
-.kindБДК,.kindА,.kindАБ{background:#b93b2e}
-.kindТК,.kindТ,.kindТР{background:#1f8f55}
-.kindКР,.kindЛ,.kindФ,.kindЭС,.kindСТ{background:#1c6fb1}
-.kindПЛ,.kindКРПЛ{background:#0b4f6c}
-.kindМ,.kindСМ{background:#6e7b85}
-.kindТН{background:#d35400}
-.kindВМБ{background:#95a5a6}
+/* Цвета фигур */
+.kindБДК,.kindА,.kindАБ{background:#b93b2e; color:#fff;}
+.kindТК,.kindТ,.kindТР{background:#1f8f55; color:#fff;}
+.kindКР,.kindЛ,.kindФ,.kindЭС,.kindСТ{background:#1c6fb1; color:#fff;}
+.kindПЛ,.kindКРПЛ{background:#0b4f6c; color:#fff;}
+.kindМ,.kindСМ{background:#6e7b85; color:#fff;}
+.kindТН{background:#d35400; color:#fff;}
+.kindВМБ{background:#95a5a6; color:#000;}
 
-/* Модалки */
-.modal-backdrop{ position:fixed; inset:0; background:#0009; display:none; align-items:center; justify-content:center; z-index:50 }
-.modal{ background:rgba(0,0,0,.86); border:.12vw solid #fff; border-radius:1.2rem; padding:16px; width:min(560px,92%); position:relative; }
-.modalTitle{ text-align:left; margin:.2rem 0 .6rem 0 }
-.form-row{ display:flex; flex-direction:column; gap:.35rem; margin:.45rem 0 }
-.form-row.right{ align-items:flex-end }
+/* Модалки - компактные */
+.modal-backdrop{ 
+  position:fixed; inset:0; background:#0009; display:none; 
+  align-items:center; justify-content:center; z-index:50;
+}
+.modal{ 
+  background:rgba(0,0,0,.9); border:.12vw solid #fff; border-radius:1.2rem; 
+  padding:1.5rem; width:min(500px,90%); position:relative; max-height:85vh;
+  display:flex; flex-direction:column;
+}
+
+.modalTitle{ 
+  text-align:center; margin:0 0 1rem 0; font-size:1.3rem; color:#80e4ff;
+}
+
+/* Профиль модалка - компактная */
+.avatarBox{ 
+  display:flex; flex-direction:column; gap:.8rem; align-items:center; 
+  justify-content:center; margin-bottom:1rem;
+}
+.avatarLarge{ 
+  width:80px; height:80px; border-radius:50%; object-fit:cover; 
+  border:2px solid #fff;
+}
+
+.modal .tabbar{
+  justify-content:center; margin:.8rem 0;
+}
+
+.modal .pane{
+  width:100%; display:none; flex-direction:column;
+}
+.modal .pane.active{ display:flex; }
+
+.form-row{ 
+  display:flex; flex-direction:column; gap:.3rem; margin:.5rem 0; text-align:left;
+}
+.form-row label{ font-weight:bold; color:#80e4ff; font-size:.9rem; }
 .form-row input{
-  padding:.5rem .7rem; border:.12vw solid #fff; border-radius:1rem;
-  background:rgba(0,0,0,.55); color:#fff; text-align:left
+  padding:.5rem; border:.12vw solid #fff; border-radius:.6rem;
+  background:rgba(0,0,0,.55); color:#fff; font-family:Arial, sans-serif;
+  font-size:.9rem;
 }
-.btnRow{ display:flex; gap:.6rem; align-items:center; justify-content:center; margin-top:.6rem }
-.waitText{ margin-top:.6rem }
+.form-row.right{ align-items:flex-end; }
 
-/* Аватар в профиле (сверху) */
-.avatarBox{ display:flex; flex-direction:column; gap:.6rem; align-items:center; justify-content:center; margin-bottom:.4rem }
-.avatarLarge{
-  width:120px; height:120px; border-radius:50%; object-fit:cover; border:2px solid #fff
+.btnRow{ 
+  display:flex; gap:.8rem; align-items:center; justify-content:center; 
+  margin-top:1rem; flex-wrap:wrap;
 }
 
-/* Скроллбары (внутри списков и правил) */
-.scroll{ scrollbar-width:thin; scrollbar-color:#666 #222 }
-.scroll::-webkit-scrollbar{ width:8px }
-.scroll::-webkit-scrollbar-track{ background:#222; border-radius:8px }
-.scroll::-webkit-scrollbar-thumb{ background:#666; border-radius:8px }
-.scroll.slim::-webkit-scrollbar{ width:6px }
+/* История игр с красивым скроллом */
+.history-container{
+  height:200px; width:100%; 
+  border:.12vw solid #fff; border-radius:1rem;
+  background:rgba(0,0,0,.5); overflow:hidden;
+}
 
-/* Профиль/авторизация табы поверх модалки */
-#profileModal .tabbar, #authModal .tabbar{ justify-content:flex-start }
+.history-list{
+  height:100%; overflow-y:auto; list-style:none; margin:0; padding:0;
+}
+
+/* Кастомный скроллбар для истории */
+.history-list{
+  scrollbar-width:thin; scrollbar-color:#80e4ff #222;
+}
+.history-list::-webkit-scrollbar{ width:12px; }
+.history-list::-webkit-scrollbar-track{ 
+  background:linear-gradient(45deg, #222, #333); 
+  border-radius:10px; margin:4px;
+}
+.history-list::-webkit-scrollbar-thumb{ 
+  background:linear-gradient(45deg, #80e4ff, #27e881); 
+  border-radius:10px; border:2px solid #222;
+}
+.history-list::-webkit-scrollbar-thumb:hover{ 
+  background:linear-gradient(45deg, #27e881, #80e4ff);
+  box-shadow:0 0 10px rgba(128,228,255,0.5);
+}
+
+.history-list li{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:.8rem; border-bottom:1px solid rgba(255,255,255,.08);
+}
+.history-list li:last-child{ border-bottom:none; }
+.history-list li:hover{ background:rgba(255,255,255,.05); }
+
+/* Обычный скроллбар */
+.scroll{
+  scrollbar-width:thin; scrollbar-color:#666 #222;
+}
+.scroll::-webkit-scrollbar{ width:8px; }
+.scroll::-webkit-scrollbar-track{ background:#222; border-radius:8px; }
+.scroll::-webkit-scrollbar-thumb{ 
+  background:linear-gradient(45deg, #80e4ff, #27e881); border-radius:8px;
+}
+.scroll::-webkit-scrollbar-thumb:hover{ 
+  background:linear-gradient(45deg, #27e881, #80e4ff);
+}
+
+/* Кастомные уведомления */
+.notification{
+  position:fixed; top:2rem; right:2rem; z-index:100;
+  background:rgba(0,0,0,.9); border:.12vw solid #80e4ff; border-radius:1rem;
+  padding:1rem 1.5rem; color:#fff; min-width:300px; max-width:400px;
+  transform:translateX(100%); 
+  -webkit-transition:transform .3s ease;
+  -moz-transition:transform .3s ease;
+  -ms-transition:transform .3s ease;
+  -o-transition:transform .3s ease;
+  transition:transform .3s ease;
+}
+.notification.show{ transform:translateX(0); }
+.notification.success{ border-color:#27e881; }
+.notification.error{ border-color:#ff5e2c; }
+.notification.warning{ border-color:#ffbc00; }
+
+.notification-title{ font-weight:bold; margin-bottom:.5rem; }
+.notification-message{ font-size:.9rem; opacity:.9; }
 
 /* Адаптив */
-@media (max-width: 1100px){
+@media (max-width: 1200px){
+  #msWrap{ width:60%; }
+  #menuHead{ font-size:9vw; }
+  .menuButs{ font-size:2.5vw; }
+}
+
+@media (max-width: 900px){
+  #msWrap{ width:80%; }
   #menuHead{ font-size:10vw; }
-  .menuButs{ font-size:3.6vw }
-  .menuButs.sm{ font-size:2.8vw }
+  .menuButs{ font-size:3vw; width:70%; }
+  .search input{ min-width:150px; }
 }
-@media (max-width: 700px){
-  #menuHead{ font-size:12vw }
-  .menuButs{ font-size:5vw; width:80% }
-  .search input{ min-width:180px }
+
+@media (max-width: 600px){
+  #msWrap{ width:95%; height:95%; }
+  #menuHead{ font-size:12vw; }
+  .menuButs{ font-size:4vw; width:80%; }
+  .modal{ width:95%; padding:1rem; }
+  .board{ width:90vw; }
 }
+
+/* Утилиты */
+.hide{opacity:0; visibility:hidden;}
+.muted{opacity:.7;}
+.text-center{text-align:center;}
+.text-left{text-align:left;}

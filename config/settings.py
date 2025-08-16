@@ -12,9 +12,10 @@ DEBUG = os.getenv("DEBUG", "True") == "True"
 ALLOWED_HOSTS = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "*").split(",")]
 
 INSTALLED_APPS = [
+    "daphne",  # Добавляем daphne для WebSocket
     "django.contrib.admin","django.contrib.auth","django.contrib.contenttypes",
     "django.contrib.sessions","django.contrib.messages","django.contrib.staticfiles",
-    "rest_framework","corsheaders",
+    "rest_framework","corsheaders","channels",
     "accounts","game","matchmaking",
 ]
 
@@ -45,7 +46,17 @@ TEMPLATES = [{
 }]
 
 WSGI_APPLICATION = "config.wsgi.application"
-ASGI_APPLICATION = "config.asgi.application"  # WS не обязателен, но оставить можно
+ASGI_APPLICATION = "config.asgi.application"
+
+# Channels
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [os.getenv("REDIS_URL", "redis://localhost:6379/0")],
+        },
+    },
+}
 
 DATABASES = {
     "default": dj_database_url.config(

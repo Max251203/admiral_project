@@ -26,7 +26,7 @@ class LoginAPI(APIView):
         if not user:
             return Response({"ok": False}, status=400)
         login(request, user)
-        avatar = user.profile.avatar.url if hasattr(user,'profile') and user.profile.avatar else ""
+        avatar = user.profile.get_avatar_url()
         return Response({"ok": True, "login": getattr(user.profile,'login', user.username), "avatar": avatar})
 
 
@@ -46,7 +46,7 @@ class Me(APIView):
             "username": request.user.username,
             "email": request.user.email,
             "login": p.login,
-            "avatar": p.avatar.url if p.avatar else ""
+            "avatar": p.get_avatar_url()
         })
 
 
@@ -73,7 +73,7 @@ class UserInfo(APIView):
         p = u.profile
         return Response({
             "id": u.id, "username": u.username, "login": p.login,
-            "avatar": p.avatar.url if p.avatar else "", "rating": p.rating_elo,
+            "avatar": p.get_avatar_url(), "rating": p.rating_elo,
             "wins": p.wins, "losses": p.losses
         })
 
@@ -123,12 +123,25 @@ class ProfileUpdate(APIView):
         username = request.POST.get("username","").strip() or user.username
         email = request.POST.get("email","").strip()
         login_name = request.POST.get("login","").strip() or p.login
+        
         if User.objects.exclude(pk=user.pk).filter(username__iexact=username).exists():
             return Response({"ok": False, "error": "username_taken"}, status=400)
         if Profile.objects.exclude(pk=p.pk).filter(login__iexact=login_name).exists():
             return Response({"ok": False, "error": "login_taken"}, status=400)
-        user.username = username; user.email = email; user.save()
+        
+        user.username = username
+        user.email = email
+        user.save()
+        
         p.login = login_name
-        if 'avatar' in request.FILES: p.avatar = request.FILES['avatar']
+        if 'avatar' in request.FILES:
+            p.avatar = request.FILES['avatar']
         p.save()
-        return Response({"ok": True, "profile": {"login": p.login, "avatar": p.avatar.url if p.avatar else ""}})
+        
+        return Response({
+            "ok": True, 
+            "profile": {
+                "login": p.login, 
+                "avatar": p.get_avatar_url()
+            }
+        })

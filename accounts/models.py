@@ -12,14 +12,25 @@ class Profile(models.Model):
     rating_elo = models.IntegerField(default=1200)
     wins = models.IntegerField(default=0)
     losses = models.IntegerField(default=0)
-    def __str__(self): return self.login or self.user.username
+    
+    def __str__(self): 
+        return self.login or self.user.username
+    
+    def get_avatar_url(self):
+        if self.avatar:
+            return self.avatar.url
+        return '/static/img/avatar_stub.png'
 
 class Friendship(models.Model):
-    PENDING="pending"; ACCEPTED="accepted"; BLOCKED="blocked"
-    STATUSES=((PENDING,"pending"),(ACCEPTED,"accepted"),(BLOCKED,"blocked"))
+    PENDING = "pending"
+    ACCEPTED = "accepted" 
+    BLOCKED = "blocked"
+    STATUSES = ((PENDING,"pending"),(ACCEPTED,"accepted"),(BLOCKED,"blocked"))
+    
     from_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="friendship_from")
     to_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="friendship_to")
     status = models.CharField(max_length=16, choices=STATUSES, default=PENDING)
     created_at = models.DateTimeField(auto_now_add=True)
+    
     class Meta:
         unique_together = ("from_user","to_user")
