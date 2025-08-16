@@ -42,24 +42,20 @@ def cancel(request):
     MatchTicket.objects.filter(user=me, active=True).update(active=False, assigned_game=None)
     return JsonResponse({"ok":True})
 
-# основной AJAX-инвайт (жми эту кнопку в Users/Друзьях)
 @login_required
 def invite_ajax(request, user_id:int):
     invitee = get_object_or_404(User, id=user_id)
     token = secrets.token_hex(12)
     FriendInvite.objects.create(inviter=request.user, invitee=invitee, token=token)
-    # уведомление адресату — появится модалка независимо от страницы
     safe_notify(invitee.id, {"type":"friend_invite","from":request.user.profile.login,"token":token})
     return JsonResponse({"ok":True, "token":token})
 
-# совместимый маршрут для старых ссылок /match/invite/<user_id>/
 @login_required
 def invite_link(request, user_id:int):
     invitee = get_object_or_404(User, id=user_id)
     token = secrets.token_hex(12)
     FriendInvite.objects.create(inviter=request.user, invitee=invitee, token=token)
     safe_notify(invitee.id, {"type":"friend_invite","from":request.user.profile.login,"token":token})
-    # отправим инициатора на список входящих, но главное — адресат получил нотификацию
     return HttpResponseRedirect("/match/invites/")
 
 @login_required
@@ -74,7 +70,6 @@ def invite_accept(request, token:str):
     g = Game.objects.create(code=code, player1=inv.inviter, player2=inv.invitee, status="SETUP", turn=1)
     GameState.objects.create(game=g, data={"turn":1,"phase":"SETUP","board":{}})
     inv.status = FriendInvite.ACCEPTED; inv.game = g; inv.save()
-    # инициатору прилетит событие с URL комнаты — base.html его автоматически перекинет
     safe_notify(inv.inviter_id, {"type":"invite_accepted","url":f"/game/r/{g.code}/"})
     return HttpResponseRedirect(f"/game/r/{g.code}/")
 
@@ -92,37 +87,30 @@ def invite_cancel(request, token:str):
     safe_notify(inv.invitee_id, {"type":"invite_cancelled"})
     return JsonResponse({"ok":True})
 
-from django.db import DatabaseError
-
 @login_required
 def notify_poll(request):
-    """
-    Возвращаем до 50 непрочитанных нотификаций и помечаем их прочитанными.
-    Важно: нельзя делать .update() по срезу QuerySet'а.
-    """
     try:
         base_qs = Notification.objects.filter(to_user=request.user, read=False).order_by("created_at")
-        ids = list(base_qs.values_list("id", flat=True)[:50])  # сначала получаем список id
-        if not ids:
-            return JsonResponse({"items": []})
+        ids = list(base_qs.values_list("id", flat=True)[:50])
+        if not ids: return JsonResponse({"items": []})
         items_qs = Notification.objects.filter(id__in=ids).order_by("created_at")
         items = [{"type": n.type, **(n.payload or {})} for n in items_qs]
-        Notification.objects.filter(id__in=ids).update(read=True)  # помечаем прочитанными одной операцией
+        Notification.objects.filter(id__in=ids).update(read=True)
         return JsonResponse({"items": items})
     except DatabaseError:
-        # на всякий случай не ломаем UI
-        return JsonResponse({"items": []})
+        return JsonResponse({"items":[]})
 
 urlpatterns = [
     path("quick/", quick),
     path("status/", status),
     path("cancel/", cancel),
 
-    path("invite/<int:user_id>/", invite_link),              # для старых ссылок
-    path("invite_ajax/<int:user_id>/", invite_ajax),         # основной AJAX-инвайт
+    path("invite/<int:user_id>/", invite_link),
+    path("invite_ajax/<int:user_id>/", invite_ajax),
     path("invites/", invites),
     path("invite/<str:token>/accept/", invite_accept),
     path("invite/<str:token>/decline/", invite_decline),
-    path("invite/<str:token>/cancel/", invite_cancel),       # чтобы кнопка «Отменить» работала
+    path("invite/<str:token>/cancel/", invite_cancel),
+
     path("notify/poll/", notify_poll),
 ]

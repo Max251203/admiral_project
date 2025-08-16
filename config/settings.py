@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 import dj_database_url
 from dotenv import load_dotenv
+from django.contrib.messages import constants as messages
 
 load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -44,9 +45,8 @@ TEMPLATES = [{
 }]
 
 WSGI_APPLICATION = "config.wsgi.application"
-ASGI_APPLICATION = "config.asgi.application"  # можно оставить, но WS не обязателен
+ASGI_APPLICATION = "config.asgi.application"  # WS не обязателен, но оставить можно
 
-# Postgres через DATABASE_URL (Render) или локальный SQLite
 DATABASES = {
     "default": dj_database_url.config(
         default=f"sqlite:///{BASE_DIR/'db.sqlite3'}",
@@ -67,7 +67,6 @@ STATIC_ROOT = BASE_DIR/"staticfiles"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR/"media"
 
-# Django 5: STORAGES вместо STATICFILES_STORAGE
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
@@ -80,8 +79,10 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES":["rest_framework.permissions.IsAuthenticatedOrReadOnly"],
 }
 
-# Сообщения (CSS-классы)
-from django.contrib.messages import constants as messages
+LOGIN_URL = "/accounts/login/"
+LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/"
+
 MESSAGE_TAGS = {
     messages.DEBUG: "debug",
     messages.INFO: "info",
@@ -90,12 +91,7 @@ MESSAGE_TAGS = {
     messages.ERROR: "error",
 }
 
-# Логин/редиректы
-LOGIN_URL = "/accounts/login/"
-LOGIN_REDIRECT_URL = "/menu/"
-LOGOUT_REDIRECT_URL = "/"
-
-# Игровые тайминги
+# Игровые константы
 GRID_ROWS = 15
 GRID_COLS = 14
 RED_LINES = [5,10]
@@ -105,7 +101,6 @@ SETUP_MINUTES = 15
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Безопасность для прод (Render)
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SECURE_SSL_REDIRECT = True

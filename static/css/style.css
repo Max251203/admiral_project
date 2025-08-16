@@ -1,0 +1,228 @@
+/* === Базовая типографика из демо === */
+@font-face{
+  font-family:Boomboom;
+  src:url('/static/fonts/Boomboom.otf');
+}
+*{
+  margin:0; padding:0; text-decoration:none;
+  -webkit-box-sizing:border-box; box-sizing:border-box;
+  text-align:center; font-family:Boomboom;
+}
+*, *:before, *:after{
+  margin:0; padding:0; box-sizing:border-box; -webkit-box-sizing:border-box;
+  position:relative;
+}
+html,body{height:100%; width:100%;}
+body{
+  background: repeating-linear-gradient(45deg,#000000,#000000 0.5vw,#1a1a1a 0vw,#1a1a1a 1vw);
+  color:#fff; overflow:hidden; /* без вертикального скролла */
+}
+.flex-center{display:flex; justify-content:center; align-items:center}
+
+/* Визуальные классы из демо */
+.cl1{color:#ff5e2c;border-color:#ff5e2c}
+.cl2{color:#8155a6;border-color:#8155a6}
+.cl3{color:#27e881;border-color:#27e881}
+.cl4{color:#80e4ff;border-color:#80e4ff}
+.lf1{background: linear-gradient(45deg,#ffbc00,#ff0058)}
+.lf2{background: linear-gradient(315deg,#03a9f4,#ff0058)}
+.lf3{background: linear-gradient(315deg,#4dff03,#00d0ff)}
+.lf4{background: linear-gradient(315deg,#00c8ff,#ffffff)}
+.gb1{background: repeating-radial-gradient(circle at 0 100%, rgba(30,30,30,.1), rgba(255,93,44,.15) 2px, rgba(125,125,125,.2) 3px, rgba(255,93,44,.15) 4px, rgba(30,30,30,.1) 5px),radial-gradient(circle at 0 100%, #000, #050505, #101010, #151515, #202020)}
+.gb2{background: repeating-radial-gradient(circle at 0 100%, rgba(30,30,30,.1), rgba(130,85,166,.15) 2px, rgba(125,125,125,.2) 3px, rgba(130,85,166,.15) 4px, rgba(30,30,30,.1) 5px),radial-gradient(circle at 0 100%, #000, #050505, #101010, #151515, #202020)}
+.gb3{background: repeating-radial-gradient(circle at 0 100%, rgba(30,30,30,.1), rgba(39,232,129,.15) 2px, rgba(125,125,125,.2) 3px, rgba(39,232,129,.15) 4px, rgba(30,30,30,.1) 5px),radial-gradient(circle at 0 100%, #000, #050505, #101010, #151515, #202020)}
+.gb4{background: repeating-radial-gradient(circle at 0 100%, rgba(30,30,30,.1), rgba(128,227,255,.15) 2px, rgba(125,125,125,.2) 3px, rgba(128,227,255,.15) 4px, rgba(30,30,30,.1) 5px),radial-gradient(circle at 0 100%, #000, #050505, #101010, #151515, #202020)}
+
+/* Основная сцена (как в демо main) */
+main{
+  position:relative; height:98%; width:90%;
+  margin:1% auto;
+  background:rgba(0,0,0,.7);
+  border-radius:2.5vw; overflow:hidden;
+  -webkit-transform-style:preserve-3d; transform-style:preserve-3d;
+  -webkit-perspective:200vw; perspective:200vw;
+}
+
+/* === flip-система из демо === */
+.front-back{
+  position:absolute; inset:0;
+  display:flex; flex-direction:column; align-items:center; justify-content:space-evenly;
+  z-index:0;
+  -webkit-backface-visibility:hidden; backface-visibility:hidden;
+  -webkit-transition:opacity 1.5s, visibility 1.5s, transform 2s;
+  transition:opacity 1.5s, visibility 1.5s, transform 2s;
+}
+.front{ opacity:1; visibility:visible; transform:rotateY(0deg) }
+.back{  opacity:0; visibility:hidden;  transform:rotateY(180deg) }
+.flip .front{ opacity:0; visibility:hidden; transform:rotateY(-180deg) }
+.flip .back{  opacity:1; visibility:visible; transform:rotateY(0deg) }
+
+/* Внутренний блок (без серебристой рамки) */
+.glass{
+  width:min(1200px,95%); height:90%;
+  border-radius:2.5vw; padding:1.2vw;
+  display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+  gap:1rem;
+}
+
+/* Заголовок как в демо */
+#menuHead{
+  letter-spacing:.6vw; display:inline-block; font-size:8vw;
+  text-shadow:.03em .03em 0 #000;
+  color:#ff5e2c;
+  margin-top:6vh;
+}
+#menuHead:after{
+  content:attr(data-shadow);
+  position:absolute; top:.06em; left:.06em; z-index:-1; text-shadow:none;
+  background-image:linear-gradient(45deg,transparent 45%, #ffffff 45%, #ffffff 55%,transparent 0);
+  background-size:.05em .05em;
+  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+  animation: shad-anim 15s linear infinite;
+}
+@keyframes shad-anim{0%{background-position:0 0}100%{background-position:100% -100%}}
+
+/* Кнопки меню из демо */
+.menuButs{
+  background:rgba(0,0,0,0); color:#fff;
+  border:.15vw outset #ffffff; border-radius:2.5vw;
+  cursor:pointer; height:auto; padding:.8rem 1.6rem;
+  font-size:2vw;
+}
+.menuButs.sm{ font-size:1.2vw; padding:.5rem 1.2rem }
+.menuButs.xs{ font-size:1rem; padding:.35rem .9rem; border-radius:1.3rem }
+.menuButs.danger{ border-color:#c23b3b; color:#ffb3b3 }
+.menuGroup{ display:flex; flex-direction:column; gap:1.1rem; align-items:center; margin-top:4vh }
+
+/* Профиль справа сверху */
+#topRight{ position:absolute; top:1vw; right:1vw }
+.profile-btn{display:flex;align-items:center;gap:.6rem;background:transparent;border:.12vw solid #fff;border-radius:2rem;padding:.35rem .8rem;color:#fff;cursor:pointer}
+.avatar{width:30px;height:30px;border-radius:50%;object-fit:cover;border:2px solid #fff}
+#profileName{font-weight:800}
+
+/* Крестик из демо (уменьшил шрифт, чтобы не выходил за линии) */
+.exit{ position:absolute; top:1vw; right:1vw; height:3vw; width:3vw; cursor:pointer }
+.exit-in{ width:inherit; text-align:center }
+.exit-txt{ font-size:.9vw; line-height:3vw; text-transform:uppercase; transition:.2s; opacity:0; cursor:pointer }
+.exit-in:before, .exit-in:after{
+  position:absolute; content:''; height:.12vw; width:inherit; left:0; background:#fff; transition:.2s
+}
+.exit-in:before{ top:calc(50% - .06vw); transform:rotate(45deg) }
+.exit-in:after{ bottom:50%; transform:rotate(-45deg) }
+.exit:hover .exit-txt{opacity:1}
+.exit:hover .exit-in:before, .exit:hover .exit-in:after{ transform:rotate(0) }
+.exit:hover .exit-in:before{ top:0 } .exit:hover .exit-in:after{ bottom:0 }
+
+/* Табы как widget (PyQt-style) */
+.tabbar{ display:flex; gap:.6rem; align-items:center; justify-content:flex-start; width:100%; margin:.4rem 0 }
+.tabbar.sub{ margin-top:.8rem }
+.tab{ background:transparent; border:.12vw solid #fff; border-radius:1.2rem; padding:.35rem .9rem; color:#fff; cursor:pointer }
+.tab.small{ font-size:1rem }
+.tab.active{ background:rgba(255,255,255,.08) }
+
+.pane{ width:100%; }
+.pane.active{ display:block }
+
+/* Поиск и списки */
+.search{ margin-left:auto; display:flex; gap:.4rem; align-items:center }
+.search input{
+  padding:.45rem .7rem; border:.12vw solid #fff; border-radius:1rem;
+  background:rgba(0,0,0,.55); color:#fff; min-width:240px; text-align:left
+}
+.lists{ width:100%; margin-top:.6rem; display:block }
+.list{
+  list-style:none; margin:0; padding:0;
+  border:.12vw solid #fff; border-radius:1rem;
+  background:rgba(0,0,0,.5); max-height:50vh; overflow:auto; text-align:left
+}
+.list li{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:.6rem .9rem; border-bottom:1px solid rgba(255,255,255,.08)
+}
+.list li:last-child{ border-bottom:none }
+
+/* Правила на всю карточку, без рамок внутри */
+.rules{ text-align:left; padding:1rem; max-height:58vh; overflow:auto; }
+
+/* Оверлей игры (fade) */
+.overlay{
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  opacity:1; visibility:visible; transition:opacity .6s ease, visibility .6s ease;
+}
+.overlay.hide{ opacity:0; visibility:hidden }
+#gameBox{
+  position:relative; width:96%; height:92%;
+  border-radius:2.5vw; padding:1vw; display:flex; flex-direction:column; gap:.6rem; align-items:center
+}
+
+/* HUD */
+.hud{ width:100%; display:flex; gap:.6rem; flex-wrap:wrap; justify-content:flex-start }
+.tag{ display:inline-block; padding:.25rem .6rem; border:.12vw solid #fff; border-radius:.9rem; background:rgba(0,0,0,.45) }
+
+/* Панели управления (как "настройки" в демо) */
+.settBox{
+  display:flex; align-items:center; justify-content:space-evenly;
+  width:100%; padding:.5rem; border-radius:2.5vw;
+}
+
+/* Игровое поле 15x14 */
+.board{
+  width:min(95vw,960px); aspect-ratio:14/15;
+  display:grid; gap:2px;
+  grid-template-columns:repeat(14,1fr); grid-template-rows:repeat(15,1fr);
+  margin:.6rem auto; border:2px solid #fff; border-radius:1.2rem; overflow:hidden;
+  background: radial-gradient(circle at 0 100%, #000, #050505, #101010, #151515, #202020);
+}
+.board .cell{ background:rgba(8,70,104,.66); display:flex; align-items:center; justify-content:center }
+.board .piece{ width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-weight:800; letter-spacing:.5px }
+
+/* Цвета фигур + русские аббревиатуры рисуются текстом, цвет через классы */
+.kindБДК,.kindА,.kindАБ{background:#b93b2e}
+.kindТК,.kindТ,.kindТР{background:#1f8f55}
+.kindКР,.kindЛ,.kindФ,.kindЭС,.kindСТ{background:#1c6fb1}
+.kindПЛ,.kindКРПЛ{background:#0b4f6c}
+.kindМ,.kindСМ{background:#6e7b85}
+.kindТН{background:#d35400}
+.kindВМБ{background:#95a5a6}
+
+/* Модалки */
+.modal-backdrop{ position:fixed; inset:0; background:#0009; display:none; align-items:center; justify-content:center; z-index:50 }
+.modal{ background:rgba(0,0,0,.86); border:.12vw solid #fff; border-radius:1.2rem; padding:16px; width:min(560px,92%); position:relative; }
+.modalTitle{ text-align:left; margin:.2rem 0 .6rem 0 }
+.form-row{ display:flex; flex-direction:column; gap:.35rem; margin:.45rem 0 }
+.form-row.right{ align-items:flex-end }
+.form-row input{
+  padding:.5rem .7rem; border:.12vw solid #fff; border-radius:1rem;
+  background:rgba(0,0,0,.55); color:#fff; text-align:left
+}
+.btnRow{ display:flex; gap:.6rem; align-items:center; justify-content:center; margin-top:.6rem }
+.waitText{ margin-top:.6rem }
+
+/* Аватар в профиле (сверху) */
+.avatarBox{ display:flex; flex-direction:column; gap:.6rem; align-items:center; justify-content:center; margin-bottom:.4rem }
+.avatarLarge{
+  width:120px; height:120px; border-radius:50%; object-fit:cover; border:2px solid #fff
+}
+
+/* Скроллбары (внутри списков и правил) */
+.scroll{ scrollbar-width:thin; scrollbar-color:#666 #222 }
+.scroll::-webkit-scrollbar{ width:8px }
+.scroll::-webkit-scrollbar-track{ background:#222; border-radius:8px }
+.scroll::-webkit-scrollbar-thumb{ background:#666; border-radius:8px }
+.scroll.slim::-webkit-scrollbar{ width:6px }
+
+/* Профиль/авторизация табы поверх модалки */
+#profileModal .tabbar, #authModal .tabbar{ justify-content:flex-start }
+
+/* Адаптив */
+@media (max-width: 1100px){
+  #menuHead{ font-size:10vw; }
+  .menuButs{ font-size:3.6vw }
+  .menuButs.sm{ font-size:2.8vw }
+}
+@media (max-width: 700px){
+  #menuHead{ font-size:12vw }
+  .menuButs{ font-size:5vw; width:80% }
+  .search input{ min-width:180px }
+}

@@ -1,130 +1,134 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
+from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
-from .models import Profile, Friendship
-from .forms import ProfileForm
-from django.db.models import Q
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import AllowAny, IsAuthenticated
 
-@login_required
-def profile(request):
-    pf = request.user.profile
-    from game.models import Game
-    games = (Game.objects.filter(Q(player1=request.user)|Q(player2=request.user))
-                  .filter(moves__isnull=False).distinct()
-                  .order_by("-created_at")[:20])
-    return render(request, "accounts/profile.html", {"profile": pf, "games": games})
+from accounts.models import Profile, Friendship
+from .serializers import RegisterSerializer
 
-@login_required
-def profile_edit(request):
-    pf = request.user.profile
-    if request.method == "POST":
-        form = ProfileForm(request.POST, request.FILES, instance=pf)
-        username = request.POST.get("username","").strip()
-        email = request.POST.get("email","").strip()
-        if form.is_valid():
-            login_new = form.cleaned_data["login"].strip()
-            if Profile.objects.exclude(pk=pf.pk).filter(login__iexact=login_new).exists():
-                messages.error(request, "Никнейм уже занят.")
-            else:
-                if User.objects.exclude(pk=request.user.pk).filter(username__iexact=username).exists():
-                    messages.error(request, "Username уже занят.")
-                else:
-                    request.user.username = username or request.user.username
-                    request.user.email = email
-                    request.user.save()
-                    form.save()
-                    messages.success(request, "Профиль обновлён.")
-                    return redirect("profile")
-        else:
-            messages.error(request, "Исправьте ошибки формы.")
-    else:
-        form = ProfileForm(instance=pf)
-    return render(request, "accounts/profile_edit.html", {"form": form})
 
-@login_required
-def friends(request):
-    me=request.user
-    accepted = Friendship.objects.filter(from_user=me, status=Friendship.ACCEPTED).values_list("to_user", flat=True)
-    accepted_rev = Friendship.objects.filter(to_user=me, status=Friendship.ACCEPTED).values_list("from_user", flat=True)
-    ids = set(accepted) | set(accepted_rev)
-    friends = [{"other_id":u.id,"other_login":u.profile.login} for u in User.objects.filter(id__in=ids)]
-    reqs = Friendship.objects.filter(to_user=me, status=Friendship.PENDING)
-    requests = [{"from_id":f.from_user_id,"from_login":f.from_user.profile.login} for f in reqs]
-    return render(request, "accounts/friends.html", {"friends":friends,"requests":requests})
+class Register(APIView):
+    permission_classes = [AllowAny]
+    def post(self, request):
+        s = RegisterSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        user = s.save()
+        return Response({"ok": True, "user": user.username})
 
-@login_required
-def friends_add(request):
-    login_name = (request.POST.get("login") or request.GET.get("login") or "").strip()
-    if login_name:
-        try:
-            u = User.objects.get(profile__login=login_name)
-        except User.DoesNotExist:
-            messages.error(request, "Пользователь с таким никнеймом не найден.")
-            return redirect("friends")
-        if u != request.user:
-            Friendship.objects.get_or_create(from_user=request.user, to_user=u, defaults={"status":Friendship.PENDING})
-            messages.success(request, "Заявка отправлена.")
-    return redirect("friends")
 
-@login_required
-def friends_accept(request, uid:int):
-    other = get_object_or_404(User, id=uid)
-    from .models import Friendship as F
-    f = get_object_or_404(F, from_user=other, to_user=request.user, status=F.PENDING)
-    f.status = F.ACCEPTED; f.save()
-    F.objects.get_or_create(from_user=request.user, to_user=other, defaults={"status":F.ACCEPTED})
-    messages.success(request, "Заявка принята.")
-    return redirect("friends")
-
-@login_required
-def friends_decline(request, uid:int):
-    other = get_object_or_404(User, id=uid)
-    from .models import Friendship as F
-    F.objects.filter(from_user=other, to_user=request.user, status=F.PENDING).delete()
-    messages.info(request, "Заявка отклонена.")
-    return redirect("friends")
-
-@login_required
-def friends_remove(request, uid:int):
-    other = get_object_or_404(User, id=uid)
-    from .models import Friendship as F
-    F.objects.filter(from_user=request.user, to_user=other).delete()
-    F.objects.filter(from_user=other, to_user=request.user).delete()
-    messages.info(request, "Друг удалён.")
-    return redirect("friends")
-
-def register_page(request):
-    if request.method == "POST":
-        username = request.POST.get("username","").strip()
-        email = request.POST.get("email","").strip()
-        login_name = request.POST.get("login","").strip()
-        password = request.POST.get("password","")
-        password2 = request.POST.get("password2","")
-        avatar = request.FILES.get("avatar")
-        if not username or not login_name or not password:
-            messages.error(request, "Заполните обязательные поля.")
-            return render(request, "accounts/register.html")
-        if password != password2:
-            messages.error(request, "Пароли не совпадают.")
-            return render(request, "accounts/register.html")
-        if User.objects.filter(username=username).exists():
-            messages.error(request, "Такой username уже занят.")
-            return render(request, "accounts/register.html")
-        if Profile.objects.filter(login__iexact=login_name).exists():
-            messages.error(request, "Никнейм уже занят.")
-            return render(request, "accounts/register.html")
-        user = User.objects.create_user(username=username, email=email, password=password)
-        prof = user.profile
-        prof.login = login_name
-        if avatar: prof.avatar = avatar
-        prof.save()
-        from django.contrib.auth import authenticate, login as auth_login
+class LoginAPI(APIView):
+    permission_classes = [AllowAny]
+    def post(self, request):
+        username = request.data.get("username","")
+        password = request.data.get("password","")
         user = authenticate(request, username=username, password=password)
-        if user:
-            auth_login(request, user)
-            messages.success(request, "Регистрация успешна. Добро пожаловать!")
-            return redirect("menu")
-        messages.info(request, "Аккаунт создан. Войдите.")
-        return redirect("login")
-    return render(request, "accounts/register.html")
+        if not user:
+            return Response({"ok": False}, status=400)
+        login(request, user)
+        avatar = user.profile.avatar.url if hasattr(user,'profile') and user.profile.avatar else ""
+        return Response({"ok": True, "login": getattr(user.profile,'login', user.username), "avatar": avatar})
+
+
+class LogoutAPI(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request):
+        logout(request)
+        return Response({"ok": True})
+
+
+class Me(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        p = request.user.profile
+        return Response({
+            "id": request.user.id,
+            "username": request.user.username,
+            "email": request.user.email,
+            "login": p.login,
+            "avatar": p.avatar.url if p.avatar else ""
+        })
+
+
+class UsersSearch(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        q = (request.GET.get("q") or "").strip()
+        qs = User.objects.select_related("profile").exclude(id=request.user.id)
+        if q:
+            qs = qs.filter(profile__login__icontains=q)
+        qs = qs.order_by("-profile__rating_elo","profile__login")[:50]
+        items = [{
+            "id": u.id, "login": u.profile.login, "username": u.username,
+            "rating": u.profile.rating_elo, "wins": u.profile.wins, "losses": u.profile.losses
+        } for u in qs]
+        return Response({"items": items})
+
+
+class UserInfo(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request, user_id: int):
+        from django.shortcuts import get_object_or_404
+        u = get_object_or_404(User.objects.select_related("profile"), id=user_id)
+        p = u.profile
+        return Response({
+            "id": u.id, "username": u.username, "login": p.login,
+            "avatar": p.avatar.url if p.avatar else "", "rating": p.rating_elo,
+            "wins": p.wins, "losses": p.losses
+        })
+
+
+class FriendsList(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        me = request.user
+        out = set(Friendship.objects.filter(from_user=me, status=Friendship.ACCEPTED).values_list("to_user", flat=True))
+        inc = set(Friendship.objects.filter(to_user=me, status=Friendship.ACCEPTED).values_list("from_user", flat=True))
+        ids = list(out | inc)
+        items = [{"id": u.id, "login": u.profile.login} for u in User.objects.filter(id__in=ids).select_related('profile')]
+        return Response({"items": items})
+
+
+class FriendAdd(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request):
+        login_name = (request.data.get("login") or "").strip()
+        if not login_name:
+            return Response({"ok": False}, status=400)
+        try:
+            u = User.objects.get(profile__login__iexact=login_name)
+        except User.DoesNotExist:
+            return Response({"ok": False, "error": "not_found"}, status=404)
+        if u == request.user:
+            return Response({"ok": False}, status=400)
+        Friendship.objects.get_or_create(from_user=request.user, to_user=u, defaults={"status": Friendship.PENDING})
+        return Response({"ok": True})
+
+
+class FriendRemove(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request, user_id: int):
+        from django.shortcuts import get_object_or_404
+        target = get_object_or_404(User, id=user_id)
+        Friendship.objects.filter(from_user=request.user, to_user=target).delete()
+        Friendship.objects.filter(from_user=target, to_user=request.user).delete()
+        return Response({"ok": True})
+
+
+class ProfileUpdate(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request):
+        user = request.user
+        p = user.profile
+        username = request.POST.get("username","").strip() or user.username
+        email = request.POST.get("email","").strip()
+        login_name = request.POST.get("login","").strip() or p.login
+        if User.objects.exclude(pk=user.pk).filter(username__iexact=username).exists():
+            return Response({"ok": False, "error": "username_taken"}, status=400)
+        if Profile.objects.exclude(pk=p.pk).filter(login__iexact=login_name).exists():
+            return Response({"ok": False, "error": "login_taken"}, status=400)
+        user.username = username; user.email = email; user.save()
+        p.login = login_name
+        if 'avatar' in request.FILES: p.avatar = request.FILES['avatar']
+        p.save()
+        return Response({"ok": True, "profile": {"login": p.login, "avatar": p.avatar.url if p.avatar else ""}})

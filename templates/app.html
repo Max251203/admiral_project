@@ -1,0 +1,205 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Адмирал</title>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body data-auth="{{ request.user.is_authenticated|yesno:'1,0' }}"
+      data-login="{% if request.user.is_authenticated %}{{ request.user.profile.login }}{% endif %}"
+      data-avatar="{% if request.user.is_authenticated and request.user.profile.avatar %}{{ request.user.profile.avatar.url }}{% else %}{% static 'img/avatar_stub.png' %}{% endif %}">
+
+  <main class="flex-center">
+    <!-- Главная карточка (меню <-> панель) -->
+    <div id="msContainer" class="front-back front">
+      <!-- Лицевая сторона: МЕНЮ -->
+      <section id="menu" class="front-back front">
+        <div class="glass flex-center">
+          <!-- Профиль справа сверху -->
+          <div id="topRight">
+            <button id="profileBtn" class="profile-btn">
+              <img id="profileAvatar" class="avatar" alt="avatar">
+              <span id="profileName"></span>
+            </button>
+          </div>
+
+          <!-- Логотип как в демо -->
+          <h1 id="menuHead" data-shadow="АДМИРАЛ">АДМИРАЛ</h1>
+
+          <div class="menuGroup">
+            <button id="startBut" type="button" class="menuButs">ИГРАТЬ</button>
+            <button id="rulesBut" type="button" class="menuButs sm">ПРАВИЛА</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Обратная сторона: ПАНЕЛЬ (Лобби/Правила) -->
+      <section id="panel" class="front-back back">
+        <div class="glass">
+          <!-- крестик назад в меню -->
+          <div class="exit" id="panelExit"><div class="exit-in"><div class="exit-txt">ВЫХОД</div></div></div>
+
+          <!-- Табы панели как widget -->
+          <div class="tabbar">
+            <button class="tab active" data-pane="pane-lobby">Лобби</button>
+            <button class="tab" data-pane="pane-rules">Правила</button>
+          </div>
+
+          <!-- Панель: ЛОББИ -->
+          <div id="pane-lobby" class="pane active">
+            <div class="settBox gb1">
+              <button id="quickBtn" class="menuButs sm">Найти случайного соперника</button>
+              <span id="lobbyStatus" class="muted"></span>
+            </div>
+
+            <!-- Внутренние вкладки: Все / Друзья -->
+            <div class="tabbar sub">
+              <button class="tab small active" data-sub="users">Все</button>
+              <button class="tab small" data-sub="friends">Друзья</button>
+              <div class="search">
+                <input id="userSearch" placeholder="Поиск по никнейму...">
+                <button id="searchBtn" class="menuButs xs">Найти</button>
+              </div>
+            </div>
+
+            <div class="lists">
+              <ul id="usersList" class="list scroll"></ul>
+              <ul id="friendsList" class="list scroll" style="display:none;"></ul>
+            </div>
+          </div>
+
+          <!-- Панель: ПРАВИЛА (на всю карточку, без рамок) -->
+          <div id="pane-rules" class="pane" style="display:none;">
+            <div class="rules">
+              <h2>Правила</h2>
+              <p>Поле 15×14, разделено на 3 зоны. Цель: уничтожить 2 ВМБ противника или все его движущиеся фишки.</p>
+              <p>Ходы по очереди: 30 сек на ход, банк времени 15 мин (при превышении хода списывается из банка). 2 паузы на партию (3 мин и 1 мин).</p>
+              <p>Группы: до 3 однотипных, по силе — по рейтингу (исключения: ПЛ против БДК/А; КРПЛ против КР).</p>
+              <p>Особые атаки: торпедный выстрел (ТК+Т), воздушная атака (А+С), атомная бомба (АБ 5×5, детонация), мины/стационарные мины, танкер.</p>
+              <p>Аббревиатуры на поле: БДК, КР, А, С, ТН, Л, ЭС, М, СМ, Ф, ТК, Т, ТР, СТ, ПЛ, КРПЛ, АБ, ВМБ.</p>
+            </div>
+          </div>
+
+          <!-- ИГРОВОЕ ОКНО (оверлей) — fade/появление, без переворота -->
+          <div id="gameWrap" class="overlay hide">
+            <div id="gameBox" class="gb2">
+              <div class="exit" id="gameExit"><div class="exit-in"><div class="exit-txt">ВЫХОД</div></div></div>
+
+              <div class="hud">
+                <div class="tag">Ход: <span id="hudTurn">--</span></div>
+                <div class="tag">Таймер: <span id="hudTimer">--</span></div>
+                <div class="tag">Банк: <span id="hudBank">--</span></div>
+              </div>
+
+              <div id="setupBar" class="settBox gb4" style="display:none;">
+                <button id="autoSetupBtn" class="menuButs xs">Сгенерировать расстановку</button>
+                <button id="readyBtn" class="menuButs xs">Готов</button>
+              </div>
+
+              <div class="settBox gb3">
+                <div class="tag">Режим:</div>
+                <div class="modeBtns">
+                  <button class="menuButs xs" data-mode="move">Ход</button>
+                  <button class="menuButs xs" data-mode="torpedo">Торпеда</button>
+                  <button class="menuButs xs" data-mode="air">Самолёт</button>
+                  <button class="menuButs xs" data-mode="bomb">Атомная</button>
+                  <button class="menuButs xs danger" id="resignBtn">Сдаться</button>
+                </div>
+              </div>
+
+              <div id="board" class="board"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Модалка профиля -->
+  <div id="profileModal" class="modal-backdrop">
+    <div class="modal">
+      <div class="exit modal-close" data-target="profileModal"><div class="exit-in"><div class="exit-txt">ВЫХОД</div></div></div>
+      <h2 class="modalTitle">Профиль</h2>
+
+      <!-- Аватар сверху с предпросмотром -->
+      <div class="avatarBox">
+        <img id="pAvatarPreview" class="avatarLarge" src="{% if request.user.is_authenticated and request.user.profile.avatar %}{{ request.user.profile.avatar.url }}{% else %}{% static 'img/avatar_stub.png' %}{% endif %}" alt="avatar">
+        <label for="pAvatar" class="menuButs xs">Сменить аватар</label>
+        <input id="pAvatar" type="file" accept="image/*" style="display:none;">
+      </div>
+
+      <div class="tabbar">
+        <button class="tab active" data-pane="p-info">Данные</button>
+        <button class="tab" data-pane="p-history">История игр</button>
+      </div>
+
+      <div id="p-info" class="pane active">
+        <form id="profileForm" enctype="multipart/form-data">
+          <div class="form-row"><label>Никнейм</label><input name="login" id="pLogin" required></div>
+          <div class="form-row"><label>Username</label><input name="username" id="pUsername" required></div>
+          <div class="form-row"><label>Email</label><input name="email" id="pEmail" type="email"></div>
+          <div class="form-row right"><button class="menuButs xs" type="submit">Сохранить</button></div>
+        </form>
+      </div>
+
+      <div id="p-history" class="pane" style="display:none;">
+        <ul id="historyList" class="list scroll slim"></ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка вход/регистрация -->
+  <div id="authModal" class="modal-backdrop">
+    <div class="modal">
+      <div class="exit modal-close" data-target="authModal"><div class="exit-in"><div class="exit-txt">ВЫХОД</div></div></div>
+      <div class="tabbar">
+        <button class="tab active" data-pane="a-login">Вход</button>
+        <button class="tab" data-pane="a-register">Регистрация</button>
+      </div>
+
+      <div id="a-login" class="pane active">
+        <form id="loginForm">
+          <div class="form-row"><label>Username</label><input name="username" required autocomplete="username"></div>
+          <div class="form-row"><label>Пароль</label><input name="password" type="password" required autocomplete="current-password"></div>
+          <div class="form-row right"><button class="menuButs xs" type="submit">Войти</button></div>
+        </form>
+      </div>
+
+      <div id="a-register" class="pane" style="display:none;">
+        <form id="registerForm">
+          <div class="form-row"><label>Username</label><input name="username" required></div>
+          <div class="form-row"><label>Email</label><input name="email" type="email"></div>
+          <div class="form-row"><label>Никнейм (в игре)</label><input name="login" required></div>
+          <div class="form-row"><label>Пароль</label><input name="password" type="password" required autocomplete="new-password"></div>
+          <div class="form-row right"><button class="menuButs xs" type="submit">Зарегистрироваться</button></div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Кастомная модалка приглашения -->
+  <div id="inviteModal" class="modal-backdrop">
+    <div class="modal center">
+      <div class="exit modal-close" data-target="inviteModal"><div class="exit-in"><div class="exit-txt">ВЫХОД</div></div></div>
+      <h3 id="inviteText">Приглашение в игру</h3>
+      <div class="btnRow">
+        <button id="inviteAccept" class="menuButs xs">Принять</button>
+        <button id="inviteDecline" class="menuButs xs danger">Отклонить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка ожидания -->
+  <div id="wait" class="modal-backdrop">
+    <div class="modal center">
+      <div class="spinner big"></div>
+      <div id="waitText" class="waitText">Ожидание...</div>
+      <div class="btnRow"><button id="waitCancel" class="menuButs xs danger">Отменить</button></div>
+    </div>
+  </div>
+
+  <script src="{% static 'js/app.js' %}"></script>
+</body>
+</html>
