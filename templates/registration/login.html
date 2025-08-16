@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Вход</h2>
+{% if form.errors %}<div class="alert error">Неверный логин или пароль.</div>{% endif %}
+<form method="post" class="form">
+  {% csrf_token %}
+  {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+  <div class="field"><label>Username</label><input type="text" name="username" required autofocus></div>
+  <div class="field"><label>Пароль</label><input type="password" name="password" required></div>
+  <button class="btn" type="submit">Войти</button>
+</form>
+<p class="hint">Нет аккаунта? <a href="/accounts/register/">Регистрация</a></p>
+{% endblock %}

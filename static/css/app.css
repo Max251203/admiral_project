@@ -1,0 +1,68 @@
+:root{
+  --bg:#0b1f33; --bg2:#061a2a; --accent:#145c8a; --danger:#c23b3b;
+  --text:#fff; --muted:#a9c4d6; --sea1:#0a3855; --sea2:#0c4d73;
+  --line:#ff3b3b; --border:#0e2b45; --ok:#25a35a;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,Segoe UI,Roboto,Arial,sans-serif}
+.container{padding:16px;max-width:1100px;margin:0 auto}
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:10px 16px}
+.nav a{color:#7bd0ff;margin-right:14px;text-decoration:none}
+.nav a:hover{text-decoration:underline}
+.nav .logout{display:inline}
+.linkbtn{background:none;border:none;color:#7bd0ff;cursor:pointer;padding:0;margin-left:8px}
+.linkbtn:hover{text-decoration:underline}
+h1,h2{margin:.6rem 0 1rem}
+.btn{display:inline-block;background:var(--accent);color:#fff;border:none;padding:.55rem .95rem;border-radius:8px;cursor:pointer}
+.btn:hover{filter:brightness(1.1)}
+.btn-danger{background:var(--danger)}
+.form{max-width:760px}
+.field{margin:.65rem 0}
+.field label{display:block;margin-bottom:.25rem;color:var(--muted)}
+.field input{width:100%;padding:.55rem .7rem;border:1px solid #164a6c;background:#0d2b41;color:#e6f6ff;border-radius:8px;outline:none}
+.field input:focus{border-color:#2aa4e0;box-shadow:0 0 0 2px #2aa4e033}
+.messages{margin:.6rem 0}
+.alert{padding:.6rem .8rem;border-radius:8px;margin:.4rem 0;background:#12314a;border:1px solid #1a4566}
+.alert.success{border-color:var(--ok)}
+.alert.error{border-color:var(--danger)}
+.hint{margin-top:.6rem;color:var(--muted)}
+.center{display:flex;justify-content:center}
+.profile{display:flex;gap:16px;align-items:center;margin-bottom:12px}
+.avatar{width:120px;height:120px;border-radius:50%;object-fit:cover;border:2px solid #fff;background:#0d2b41}
+.avatar.preview{width:180px;height:180px}
+.dropzone{border:2px dashed #2aa4e0;border-radius:12px;padding:16px;min-height:200px;display:flex;align-items:center;justify-content:center;text-align:center;color:#9ed8ff;background:#0d2b41;cursor:pointer}
+.dropzone.drag{background:#0f3652}
+.list{list-style:none;padding:0}
+.list li{padding:.35rem 0;border-bottom:1px solid #10395133}
+
+/* Поиск пользователей и модалка */
+.searchbar{display:flex;gap:8px;margin:.5rem 0}
+.searchbar input{flex:1}
+.modal-backdrop{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;z-index:50}
+.modal{background:#0d2b41;border:1px solid #1a4566;border-radius:10px;padding:16px;max-width:520px;width:92%}
+.modal .row{display:flex;gap:12px;align-items:center}
+.modal .avatar{width:96px;height:96px}
+
+/* Игровое поле */
+.board-wrap{display:flex;gap:16px;flex-wrap:wrap}
+.board{display:grid;gap:2px;width:min(95vw,900px);aspect-ratio:14/15;background:linear-gradient(180deg,var(--sea1),var(--sea2));border:2px solid #fff;margin-top:8px;border-radius:8px;overflow:hidden}
+.board{grid-template-columns:repeat(var(--cols),1fr);grid-template-rows:repeat(var(--rows),1fr)}
+.cell{background:rgba(8,70,104,.66);position:relative;display:flex;align-items:center;justify-content:center;user-select:none}
+.cell::after{content:'';position:absolute;left:0;right:0;top:calc((5/15)*100% - 1px);height:2px;background:var(--line)}
+.cell::before{content:'';position:absolute;left:0;right:0;top:calc((10/15)*100% - 1px);height:2px;background:var(--line)}
+.cell.sel{outline:2px solid #ffd54a}
+.piece{display:inline-flex;align-items:center;justify-content:center;width:100%;height:100%;font-weight:800;letter-spacing:.5px}
+.owner1{outline:2px solid #6cf}
+.owner2{outline:2px solid #fc6}
+.kindBDK,.kindA,.kindAB{background:#b93b2e}
+.kindTK,.kindT,.kindTR{background:#1f8f55}
+.kindKR,.kindL,.kindF,.kindES,.kindST{background:#1c6fb1}
+.kindPL,.kindKRPL{background:#0b4f6c}
+.kindM,.kindSM{background:#6e7b85}
+.kindTN{background:#d35400}
+.kindVMB{background:#95a5a6}
+.hud{display:flex;gap:16px;flex-wrap:wrap;margin-top:6px}
+.controls{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap}
+.tag{display:inline-block;padding:.25rem .5rem;border:1px solid #1a4566;border-radius:6px;background:#12314a}

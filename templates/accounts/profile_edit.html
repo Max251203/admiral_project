@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+<h2>Редактирование профиля</h2>
+<form method="post" enctype="multipart/form-data" class="form">
+  {% csrf_token %}
+
+  <div class="center">
+    <div class="dropzone" onclick="document.getElementById('avatar').click()" style="max-width:420px;width:100%;">
+      <input id="avatar" type="file" name="avatar" accept="image/*" hidden>
+      <img id="preview" class="avatar preview" src="{% if request.user.profile.avatar %}{{ request.user.profile.avatar.url }}{% else %}{% static 'img/avatar_stub.png' %}{% endif %}" />
+    </div>
+  </div>
+
+  <div class="field"><label>Никнейм (в игре)</label><input name="login" value="{{ request.user.profile.login }}" required></div>
+  <div class="field"><label>Username</label><input name="username" value="{{ request.user.username }}" required></div>
+  <div class="field"><label>Email</label><input name="email" type="email" value="{{ request.user.email }}"></div>
+
+  <button class="btn" type="submit">Сохранить</button>
+</form>
+<script>
+document.getElementById('avatar').addEventListener('change', e=>{
+  const f=e.target.files?.[0]; if(!f) return;
+  const fr=new FileReader(); fr.onload=ev=>{ document.getElementById('preview').src=ev.target.result; }; fr.readAsDataURL(f);
+});
+</script>
+{% endblock %}

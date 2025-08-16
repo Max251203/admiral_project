@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: admiral-web
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: daphne -b 0.0.0.0 -p $PORT config.asgi:application
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: admiral-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: admiral-redis
+          type: redis
+          property: connectionString
+  - type: redis
+    name: admiral-redis
+    plan: free
+
+databases:
+  - name: admiral-db
+    plan: free

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Адмирал</title>
+  <link rel="stylesheet" href="/static/css/app.css" />
+  <script>
+  function getCookie(name){
+    const v = document.cookie.split(';').map(s=>s.trim()).find(s=>s.startsWith(name+'='));
+    return v ? decodeURIComponent(v.split('=')[1]) : '';
+  }
+  window.csrfToken = () => getCookie('csrftoken');
+  window.api = async (url, method='GET', data=null) => {
+    const opts = { method, credentials:'same-origin', headers:{} };
+    if(method !== 'GET'){
+      opts.headers['Content-Type'] = 'application/json';
+      opts.headers['X-CSRFToken'] = window.csrfToken();
+      opts.body = data ? JSON.stringify(data) : null;
+    }
+    const r = await fetch(url, opts);
+    if(!r.ok) throw new Error('HTTP '+r.status+' '+url);
+    try { return await r.json(); } catch { return {}; }
+  };
+  </script>
+  <style>
+  .modal-backdrop{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;z-index:50}
+  .modal{background:#0d2b41;border:1px solid #1a4566;border-radius:10px;padding:16px;max-width:520px;width:92%}
+  .spinner{width:28px;height:28px;border:3px solid #1a4566;border-top-color:#7bd0ff;border-radius:50%;animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .messages{position:fixed;top:20px;right:20px;z-index:60;max-width:420px}
+  .alert{margin:.4rem 0;padding:.6rem .8rem;border-radius:8px;background:#12314a;border:1px solid #1a4566}
+  .alert.success{border-color:#25a35a} .alert.error{border-color:#c23b3b} .alert.info{border-color:#2aa4e0}
+  </style>
+</head>
+<body data-auth="{{ request.user.is_authenticated|yesno:'1,0' }}">
+<header class="topbar">
+  <nav class="nav">
+    <a href="/">Главная</a>
+    <a href="/menu/">Меню</a>
+    <a href="/accounts/users/">Пользователи</a>
+    <a href="/rules/">Правила</a>
+    {% if request.user.is_authenticated %}
+      <a href="/accounts/profile/">Профиль</a>
+      <form class="logout" action="/accounts/logout/" method="post" style="display:inline">
+        {% csrf_token %}<button type="submit" class="linkbtn">Выйти</button>
+      </form>
+    {% else %}
+      <a href="/accounts/login/">Войти</a>
+      <a href="/accounts/register/">Регистрация</a>
+    {% endif %}
+  </nav>
+</header>
+
+<main class="container">
+  {% if messages %}<div class="messages">{% for m in messages %}<div class="alert {{ m.tags }}">{{ m }}</div>{% endfor %}</div>{% endif %}
+  {% block content %}{% endblock %}
+</main>
+
+<!-- Ожидание -->
+<div id="wait" class="modal-backdrop" style="display:none">
+  <div class="modal" style="text-align:center">
+    <div id="waitText" style="margin-bottom:10px">Ожидание...</div>
+    <div style="display:flex;gap:8px;justify-content:center;align-items:center;margin-bottom:10px"><div class="spinner"></div></div>
+    <button class="btn btn-danger" id="waitCancel">Отменить</button>
+  </div>
+</div>
+
+<!-- Диалог приглашения -->
+<div id="dlg" class="modal-backdrop" style="display:none">
+  <div class="modal">
+    <h3 id="dlgTitle">Приглашение в игру</h3>
+    <p id="dlgText"></p>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-danger" id="dlgDecline">Отклонить</button>
+      <button class="btn" id="dlgAccept">Принять</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// контекст ожидания (чтобы отменять именно тот инвайт)
+let WaitCtx = { active:false, token:null, canceler:null };
+
+function showWaiting(text, onCancel, token=null){
+  document.getElementById('waitText').textContent = text || 'Ожидание...';
+  WaitCtx.active = true; WaitCtx.token = token || null; WaitCtx.canceler = onCancel || null;
+  document.getElementById('wait').style.display = 'flex';
+}
+function hideWaiting(){
+  document.getElementById('wait').style.display = 'none';
+  WaitCtx = { active:false, token:null, canceler:null };
+}
+document.getElementById('waitCancel').onclick = async ()=>{
+  try { if (WaitCtx.canceler) await WaitCtx.canceler(); } finally { hideWaiting(); }
+};
+
+// Модалка приглашения
+let currentInviteToken = null;
+function showInvite(fromLogin, token){
+  currentInviteToken = token;
+  document.getElementById('dlgText').textContent = fromLogin + ' приглашает вас в игру';
+  document.getElementById('dlg').style.display = 'flex';
+}
+function hideDialog(){ document.getElementById('dlg').style.display='none'; currentInviteToken=null; }
+document.getElementById('dlgAccept').onclick = ()=>{ if(currentInviteToken) location.href = '/match/invite/'+currentInviteToken+'/accept/'; };
+document.getElementById('dlgDecline').onclick = ()=>{ if(currentInviteToken) location.href = '/match/invite/'+currentInviteToken+'/decline/'; hideDialog(); };
+
+// Поллинг уведомлений — срабатывает на любой странице
+const IS_AUTH = document.body.dataset.auth === '1';
+function handleEvent(m){
+  if(!m||!m.type) return;
+  if(m.type==='friend_invite'){ showInvite(m.from, m.token); }
+  if(m.type==='invite_accepted'){ if(WaitCtx.active) hideWaiting(); if(m.url) location.href = m.url; }
+  if(m.type==='invite_declined'){ if(WaitCtx.active) hideWaiting(); alert('Ваше приглашение отклонено.'); }
+  if(m.type==='invite_cancelled'){ hideDialog(); }
+  if(m.type==='match_found'){ if(WaitCtx.active) hideWaiting(); if(m.url) location.href = m.url; }
+}
+if(IS_AUTH){
+  setInterval(async ()=>{
+    try{
+      const data = await api('/match/notify/poll/');
+      (data.items||[]).forEach(handleEvent);
+    }catch(e){}
+  }, 1500);
+}
+</script>
+</body>
+</html>

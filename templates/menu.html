@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Меню</h2>
+<p><button id="btnQuick" class="btn">Найти случайного соперника</button></p>
+<ul class="menu">
+  <li><a href="/accounts/users/">Пользователи</a></li>
+  <li><a href="/accounts/friends/">Друзья</a></li>
+  <li><a href="/match/invites/">Входящие приглашения</a></li>
+  <li><a href="/rules/">Правила</a></li>
+</ul>
+<script>
+let quickPoll=null;
+document.getElementById('btnQuick').onclick=async ()=>{
+  try{
+    const res=await api('/match/quick/');
+    if(res.url){ location.href=res.url; return; }
+    if(res.queued){
+      showWaiting('Ищем соперника...', async ()=>{ await api('/match/cancel/'); hideWaiting(); if(quickPoll){clearInterval(quickPoll);quickPoll=null;} });
+      if(quickPoll) clearInterval(quickPoll);
+      quickPoll=setInterval(async ()=>{
+        const s=await api('/match/status/');
+        if(s.url){ clearInterval(quickPoll); quickPoll=null; hideWaiting(); location.href=s.url; }
+      },2000);
+    }
+  }catch(e){ alert('Не удалось начать поиск'); }
+};
+</script>
+{% endblock %}

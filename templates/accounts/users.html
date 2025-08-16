@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Пользователи</h2>
+<div class="searchbar">
+  <input id="q" placeholder="Искать по никнейму..." />
+  <button class="btn" id="btnFind">Найти</button>
+</div>
+<ul class="list" id="users"></ul>
+<script>
+function render(items){
+  const ul=document.getElementById('users'); ul.innerHTML='';
+  if(items.length===0){ ul.innerHTML='<li>Пока нет других пользователей</li>'; return; }
+  items.forEach(u=>{
+    const li=document.createElement('li');
+    li.innerHTML=`<b>${u.login}</b> <span class="tag">Рейтинг: ${u.rating} • W:${u.wins}/L:${u.losses}</span>
+      <span style="float:right;display:flex;gap:8px">
+        <button class="btn btn-invite" data-id="${u.id}">Пригласить</button>
+        <a class="btn" href="/accounts/friends/add/?login=${encodeURIComponent(u.login)}">Добавить в друзья</a>
+      </span>`;
+    ul.appendChild(li);
+  });
+  document.querySelectorAll('.btn-invite').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const uid = btn.dataset.id;
+      try{
+        const res = await api(`/match/invite_ajax/${uid}/`);
+        if(res.ok){
+          const token = res.token;
+          showWaiting('Ожидаем ответ соперника...', async ()=>{
+            await api(`/match/invite/${token}/cancel/`);
+          }, token);
+        }
+      }catch(e){ alert('Не удалось отправить приглашение'); }
+    };
+  });
+}
+async function loadInitial(){ const data=await api('/accounts/api/users/'); render(data.items||[]); }
+async function search(q){ const data=await api(`/accounts/api/users/?q=${encodeURIComponent(q)}`); render(data.items||[]); }
+document.getElementById('btnFind').onclick=()=>search(document.getElementById('q').value);
+document.getElementById('q').addEventListener('input',e=>search(e.target.value));
+document.addEventListener('DOMContentLoaded', loadInitial);
+</script>
+{% endblock %}
