@@ -14,17 +14,10 @@ class Game(models.Model):
 
     bank_ms_p1 = models.IntegerField(default=15*60*1000)
     bank_ms_p2 = models.IntegerField(default=15*60*1000)
-    
+
     setup_deadline_at = models.DateTimeField(null=True, blank=True)
     turn_deadline_at = models.DateTimeField(null=True, blank=True)
     last_tick_at = models.DateTimeField(null=True, blank=True)
-    
-    # Паузы
-    pause_until = models.DateTimeField(null=True, blank=True)
-    short_pause_p1 = models.BooleanField(default=False)  # Короткая пауза игрока 1
-    long_pause_p1 = models.BooleanField(default=False)   # Длинная пауза игрока 1
-    short_pause_p2 = models.BooleanField(default=False)  # Короткая пауза игрока 2
-    long_pause_p2 = models.BooleanField(default=False)   # Длинная пауза игрока 2
 
     ready_p1 = models.BooleanField(default=False)
     ready_p2 = models.BooleanField(default=False)
@@ -33,6 +26,14 @@ class Game(models.Model):
 
     winner = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="wins_as_user")
     win_reason = models.CharField(max_length=20, blank=True, default="")
+
+    # Паузы
+    short_pause_p1 = models.BooleanField(default=False)  # использована ли короткая пауза
+    long_pause_p1 = models.BooleanField(default=False)
+    short_pause_p2 = models.BooleanField(default=False)
+    long_pause_p2 = models.BooleanField(default=False)
+    pause_until = models.DateTimeField(null=True, blank=True)
+    pause_initiator = models.IntegerField(null=True, blank=True)  # 1/2
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -46,7 +47,7 @@ class Move(models.Model):
     game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name="moves")
     number = models.IntegerField()
     actor = models.IntegerField()  # 1/2
-    type = models.CharField(max_length=16)  # move/torpedo/air/bomb/pause/resign/setup
+    type = models.CharField(max_length=16)  # move/torpedo/air/bomb/pause/resign/setup/cancel_pause
     payload = models.JSONField(default=dict)
     created_at = models.DateTimeField(auto_now_add=True)
 

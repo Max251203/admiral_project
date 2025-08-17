@@ -1,7 +1,7 @@
 from django.urls import path
 from .api.views import (
     Register, LoginAPI, LogoutAPI, Me, UsersSearch, UserInfo,
-    FriendsList, FriendAdd, FriendRemove, ProfileUpdate
+    FriendsList, FriendAdd, FriendRemove, ProfileUpdate, UpdateStats
 )
 
 urlpatterns = [
@@ -15,4 +15,5 @@ urlpatterns = [
     path("api/friends/add/", FriendAdd.as_view(), name="api_friend_add"),
     path("api/friends/remove/<int:user_id>/", FriendRemove.as_view(), name="api_friend_remove"),
     path("api/profile/update/", ProfileUpdate.as_view(), name="api_profile_update"),
+    path("api/update_stats/", UpdateStats.as_view(), name="api_update_stats"),
 ]

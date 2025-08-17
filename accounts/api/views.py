@@ -7,7 +7,6 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from accounts.models import Profile, Friendship
 from ..serializers import RegisterSerializer
 
-
 class Register(APIView):
     permission_classes = [AllowAny]
     def post(self, request):
@@ -15,7 +14,6 @@ class Register(APIView):
         s.is_valid(raise_exception=True)
         user = s.save()
         return Response({"ok": True, "user": user.username})
-
 
 class LoginAPI(APIView):
     permission_classes = [AllowAny]
@@ -26,16 +24,14 @@ class LoginAPI(APIView):
         if not user:
             return Response({"ok": False}, status=400)
         login(request, user)
-        avatar = user.profile.get_avatar_url()
+        avatar = user.profile.avatar.url if hasattr(user,'profile') and user.profile.avatar else ""
         return Response({"ok": True, "login": getattr(user.profile,'login', user.username), "avatar": avatar})
-
 
 class LogoutAPI(APIView):
     permission_classes = [IsAuthenticated]
     def post(self, request):
         logout(request)
         return Response({"ok": True})
-
 
 class Me(APIView):
     permission_classes = [IsAuthenticated]
@@ -46,9 +42,11 @@ class Me(APIView):
             "username": request.user.username,
             "email": request.user.email,
             "login": p.login,
-            "avatar": p.get_avatar_url()
+            "avatar": p.avatar.url if p.avatar else "",
+            "rating_elo": p.rating_elo,
+            "wins": p.wins,
+            "losses": p.losses,
         })
-
 
 class UsersSearch(APIView):
     permission_classes = [IsAuthenticated]
@@ -59,11 +57,14 @@ class UsersSearch(APIView):
             qs = qs.filter(profile__login__icontains=q)
         qs = qs.order_by("-profile__rating_elo","profile__login")[:50]
         items = [{
-            "id": u.id, "login": u.profile.login, "username": u.username,
-            "rating": u.profile.rating_elo, "wins": u.profile.wins, "losses": u.profile.losses
+            "id": u.id, 
+            "login": u.profile.login, 
+            "username": u.username,
+            "rating": u.profile.rating_elo, 
+            "wins": u.profile.wins, 
+            "losses": u.profile.losses
         } for u in qs]
         return Response({"items": items})
-
 
 class UserInfo(APIView):
     permission_classes = [IsAuthenticated]
@@ -73,10 +74,9 @@ class UserInfo(APIView):
         p = u.profile
         return Response({
             "id": u.id, "username": u.username, "login": p.login,
-            "avatar": p.get_avatar_url(), "rating": p.rating_elo,
+            "avatar": p.avatar.url if p.avatar else "", "rating": p.rating_elo,
             "wins": p.wins, "losses": p.losses
         })
-
 
 class FriendsList(APIView):
     permission_classes = [IsAuthenticated]
@@ -88,7 +88,6 @@ class FriendsList(APIView):
         items = [{"id": u.id, "login": u.profile.login} for u in User.objects.filter(id__in=ids).select_related('profile')]
         return Response({"items": items})
 
-
 class FriendAdd(APIView):
     permission_classes = [IsAuthenticated]
     def post(self, request):
@@ -96,14 +95,21 @@ class FriendAdd(APIView):
         if not login_name:
             return Response({"ok": False}, status=400)
         try:
-            u = User.objects.get(profile__login__iexact=login_name)
+            target = User.objects.get(profile__login__iexact=login_name)
         except User.DoesNotExist:
             return Response({"ok": False, "error": "not_found"}, status=404)
-        if u == request.user:
+        if target == request.user:
             return Response({"ok": False}, status=400)
-        Friendship.objects.get_or_create(from_user=request.user, to_user=u, defaults={"status": Friendship.PENDING})
+        # Авто-акцепт дружбы: создаем/обновляем обе записи в ACCEPTED
+        Friendship.objects.update_or_create(
+            from_user=request.user, to_user=target,
+            defaults={"status": Friendship.ACCEPTED}
+        )
+        Friendship.objects.update_or_create(
+            from_user=target, to_user=request.user,
+            defaults={"status": Friendship.ACCEPTED}
+        )
         return Response({"ok": True})
-
 
 class FriendRemove(APIView):
     permission_classes = [IsAuthenticated]
@@ -114,7 +120,6 @@ class FriendRemove(APIView):
         Friendship.objects.filter(from_user=target, to_user=request.user).delete()
         return Response({"ok": True})
 
-
 class ProfileUpdate(APIView):
     permission_classes = [IsAuthenticated]
     def post(self, request):
@@ -123,25 +128,18 @@ class ProfileUpdate(APIView):
         username = request.POST.get("username","").strip() or user.username
         email = request.POST.get("email","").strip()
         login_name = request.POST.get("login","").strip() or p.login
-        
         if User.objects.exclude(pk=user.pk).filter(username__iexact=username).exists():
             return Response({"ok": False, "error": "username_taken"}, status=400)
         if Profile.objects.exclude(pk=p.pk).filter(login__iexact=login_name).exists():
             return Response({"ok": False, "error": "login_taken"}, status=400)
-        
-        user.username = username
-        user.email = email
-        user.save()
-        
+        user.username = username; user.email = email; user.save()
         p.login = login_name
-        if 'avatar' in request.FILES:
-            p.avatar = request.FILES['avatar']
+        if 'avatar' in request.FILES: p.avatar = request.FILES['avatar']
         p.save()
-        
-        return Response({
-            "ok": True, 
-            "profile": {
-                "login": p.login, 
-                "avatar": p.get_avatar_url()
-            }
-        })
+        return Response({"ok": True, "profile": {"login": p.login, "avatar": p.avatar.url if p.avatar else ""}})
+
+# Ничего не делает, просто заглушает фронтовый вызов
+class UpdateStats(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request):
+        return Response({"ok": True})

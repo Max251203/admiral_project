@@ -11,77 +11,62 @@
       data-login="{% if request.user.is_authenticated %}{{ request.user.profile.login }}{% endif %}"
       data-avatar="{% if request.user.is_authenticated %}{{ request.user.profile.get_avatar_url }}{% else %}{% static 'img/avatar_stub.png' %}{% endif %}">
 
-    <main class="flex-center">
-    <!-- Контейнер как в игре-примере -->
+  <main class="flex-center">
     <div id="msWrap" class="front-back front flex-center">
       <div id="msContainer" class="flex-center">
         
         <!-- МЕНЮ -->
         <div id="menu" class="front-back front">
-          <!-- Профиль справа сверху -->
           <div id="topRight">
             <button id="profileBtn" class="profile-btn">
               <img id="profileAvatar" class="avatar" alt="avatar">
               <span id="profileName"></span>
             </button>
+            <button id="logoutBtn" class="logout-btn">Выход</button>
           </div>
 
-          <!-- Логотип и кнопки -->
           <h1 id="menuHead" class="menu-font" data-shadow="АДМИРАЛ">АДМИРАЛ</h1>
           <button id="startBut" type="button" class="menuButs menu-font">ИГРАТЬ</button>
           <button id="rulesBut" type="button" class="menuButs menu-font">ПРАВИЛА</button>
         </div>
 
-        <!-- НАСТРОЙКИ (используем для лобби/правил/игры) -->
+        <!-- ОСНОВНАЯ КАРТОЧКА -->
         <div id="settings" class="front-back back">
           <div class="card-inner">
             <div class="exit" id="settExit">
               <div class="exit-in"><div class="exit-txt">ВЫХОД</div></div>
             </div>
 
-            <!-- Контент настроек -->
             <div id="settingsContent" style="width:100%; height:100%; display:flex; flex-direction:column;">
               
               <!-- ПРАВИЛА -->
               <div id="rulesContent" class="content-pane" style="display:none;">
                 <h2 class="text-center" style="margin-bottom:1rem; color:#80e4ff">Правила игры "Адмирал"</h2>
                 <div class="rules">
-                  <h3>Цель игры</h3>
-                  <p>Уничтожить две военно-морские базы (ВМБ) противника или все его движущиеся фишки.</p>
-                  
-                  <h3>Подготовка</h3>
-                  <p>Поле 15×14 клеток, разделено на 3 зоны красными линиями. Каждый игрок размещает 61 фишку в своей зоне (5×14 клеток) за 15 минут.</p>
-                  
-                  <h3>Состав флота</h3>
-                  <p><strong>БДК</strong> (2), <strong>КР</strong> (6), <strong>А</strong> (1), <strong>С</strong> (1), <strong>ТН</strong> (1), <strong>Л</strong> (2), <strong>ЭС</strong> (6), <strong>М</strong> (6), <strong>СМ</strong> (1), <strong>Ф</strong> (6), <strong>ТК</strong> (6), <strong>Т</strong> (6), <strong>ТР</strong> (6), <strong>СТ</strong> (6), <strong>ПЛ</strong> (1), <strong>КРПЛ</strong> (1), <strong>АБ</strong> (1), <strong>ВМБ</strong> (2)</p>
-                  
-                  <h3>Ходы и время</h3>
-                  <p>Игроки ходят по очереди. На каждый ход — 30 секунд. Общий банк времени — 15 минут. При превышении хода время списывается из банка.</p>
-                  
-                  <h3>Группы и атаки</h3>
-                  <p>Корабли могут объединяться в группы до 3 единиц. Сила группы = сумма рейтингов кораблей.</p>
-                  <p><strong>Особые правила:</strong> ПЛ уничтожает БДК и А; КРПЛ уничтожает КР.</p>
-                  
-                  <h3>Специальные атаки</h3>
-                  <p><strong>Торпедный выстрел:</strong> ТК + Т (7 направлений)</p>
-                  <p><strong>Воздушная атака:</strong> А + С (5 клеток вперед)</p>
-                  <p><strong>Атомная бомба:</strong> АБ взрывается в квадрате 5×5</p>
-                  <p><strong>Мины:</strong> М уничтожает атакующего (кроме ТР), СМ уничтожает всех</p>
-                  
-                  <h3>Победа</h3>
-                  <p>Игра заканчивается когда один из игроков уничтожает 2 ВМБ противника или все его движущиеся фишки, либо когда у игрока заканчивается время.</p>
+                  <div class="rules-inner">
+                    <h3>Цель игры</h3>
+                    <p>Уничтожить две военно-морские базы (ВМБ) противника или все его движущиеся фишки.</p>
+                    <h3>Подготовка</h3>
+                    <p>Поле 15×14, три зоны. Каждый игрок размещает 61 фишку в своей зоне (5×14) за 15 минут.</p>
+                    <h3>Состав флота</h3>
+                    <p><strong>БДК</strong> (2), <strong>КР</strong> (6), <strong>А</strong> (1), <strong>С</strong> (1), <strong>ТН</strong> (1), <strong>Л</strong> (2), <strong>ЭС</strong> (6), <strong>М</strong> (6), <strong>СМ</strong> (1), <strong>Ф</strong> (6), <strong>ТК</strong> (6), <strong>Т</strong> (6), <strong>ТР</strong> (6), <strong>СТ</strong> (6), <strong>ПЛ</strong> (1), <strong>КРПЛ</strong> (1), <strong>АБ</strong> (1), <strong>ВМБ</strong> (2)</p>
+                    <h3>Ходы и время</h3>
+                    <p>Игроки ходят по очереди. На ход — 30 сек. Общий банк — 15 мин. Превышение — списание из банка. Пропуск хода запрещен.</p>
+                    <h3>Группы и атаки</h3>
+                    <p>Группа до 3 фишек одного типа, сила — сумма рейтингов. ПЛ бьет БДК и А; КРПЛ бьет КР. Атака происходит при входе на клетку соперника.</p>
+                    <h3>Победа</h3>
+                    <p>Уничтожение 2 ВМБ противника или всех подвижных фишек, либо истечение времени.</p>
+                  </div>
                 </div>
               </div>
 
               <!-- ЛОББИ -->
               <div id="lobbyContent" class="content-pane" style="display:none;">
-                <!-- Табы -->
                 <div class="tabbar">
                   <button class="tab active" data-pane="pane-quick">Быстрая игра</button>
                   <button class="tab" data-pane="pane-friends">Друзья</button>
                 </div>
 
-                <!-- Быстрая игра -->
                 <div id="pane-quick" class="pane active">
                   <div class="lobbyContent">
                     <div class="settBox">
@@ -93,14 +78,12 @@
                         </div>
                       </div>
                     </div>
-
                     <div class="lists">
                       <ul id="usersList" class="list"></ul>
                     </div>
                   </div>
                 </div>
 
-                <!-- Друзья -->
                 <div id="pane-friends" class="pane">
                   <div class="lobbyContent">
                     <div class="lists">
@@ -113,11 +96,8 @@
               <!-- ИГРА -->
               <div id="gameContent" class="content-pane" style="display:none;">
                 <div class="gameContent">
-                  <!-- HUD сверху -->
                   <div class="game-hud">
-                    <div class="tag">
-                      <span id="turnIndicator">Ваш ход</span>
-                    </div>
+                    <div class="tag"><span id="turnIndicator">Ваш ход</span></div>
                     <div class="tag">Таймер: <span id="hudTimer">30s</span></div>
                     <div class="tag">Банк: <span id="hudBank">15:00</span></div>
                     <div class="tag">
@@ -126,27 +106,18 @@
                     </div>
                   </div>
 
-                  <!-- Левая панель - список фишек -->
                   <div class="ships-panel">
                     <h3>Флот</h3>
-                    <div id="shipsContainer">
-                      <!-- Корабли будут добавлены через JS -->
-                    </div>
+                    <div id="shipsContainer"></div>
                   </div>
 
-                  <!-- Игровое поле -->
                   <div class="board-container">
-                    <div id="board" class="board">
-                      <!-- Клетки будут добавлены через JS -->
-                    </div>
+                    <div id="board" class="board"></div>
                   </div>
 
-                  <!-- Правая панель - управление -->
                   <div class="controls-panel">
                     <h3>Управление</h3>
-                    <div id="controlsContainer">
-                      <!-- Кнопки управления будут добавлены через JS -->
-                    </div>
+                    <div id="controlsContainer"></div>
                   </div>
                 </div>
               </div>
@@ -154,115 +125,72 @@
             </div>
           </div>
         </div>
+
       </div>
     </div>
   </main>
 
-  <!-- Модалка профиля -->
+  <!-- Профиль -->
   <div id="profileModal" class="modal-backdrop">
     <div class="modal">
       <div class="exit modal-close" data-target="profileModal">
         <div class="exit-in"><div class="exit-txt">ВЫХОД</div></div>
       </div>
-      
       <h2 class="modalTitle">Профиль</h2>
-
       <div class="avatarBox">
         <img id="pAvatarPreview" class="avatarLarge" src="{% static 'img/avatar_stub.png' %}" alt="avatar">
         <label for="pAvatar" class="menuButs xs">Сменить аватар</label>
         <input id="pAvatar" type="file" accept="image/*" style="display:none;">
       </div>
-
       <div class="tabbar">
         <button class="tab active" data-pane="p-info">Данные</button>
         <button class="tab" data-pane="p-history">История игр</button>
       </div>
-
       <div id="p-info" class="pane active">
         <form id="profileForm" enctype="multipart/form-data">
-          <div class="form-row">
-            <label>Никнейм</label>
-            <input name="login" id="pLogin" required>
-          </div>
-          <div class="form-row">
-            <label>Username</label>
-            <input name="username" id="pUsername" required>
-          </div>
-          <div class="form-row">
-            <label>Email</label>
-            <input name="email" id="pEmail" type="email">
-          </div>
-          <div class="btnRow">
-            <button class="menuButs xs" type="submit">Сохранить</button>
-          </div>
+          <div class="form-row"><label>Никнейм</label><input name="login" id="pLogin" required></div>
+          <div class="form-row"><label>Username</label><input name="username" id="pUsername" required></div>
+          <div class="form-row"><label>Email</label><input name="email" id="pEmail" type="email"></div>
+          <div class="btnRow"><button class="menuButs xs" type="submit">Сохранить</button></div>
         </form>
       </div>
-
       <div id="p-history" class="pane">
-        <div class="history-container">
-          <ul id="historyList" class="history-list"></ul>
-        </div>
+        <div class="history-container"><ul id="historyList" class="history-list"></ul></div>
       </div>
     </div>
   </div>
 
-  <!-- Модалка авторизации -->
+  <!-- Авторизация -->
   <div id="authModal" class="modal-backdrop">
     <div class="modal">
       <div class="exit modal-close" data-target="authModal">
         <div class="exit-in"><div class="exit-txt">ВЫХОД</div></div>
       </div>
-      
       <h2 class="modalTitle">Авторизация</h2>
-      
       <div class="tabbar">
         <button class="tab active" data-pane="a-login">Вход</button>
         <button class="tab" data-pane="a-register">Регистрация</button>
       </div>
-
       <div id="a-login" class="pane active">
         <form id="loginForm">
-          <div class="form-row">
-            <label>Username</label>
-            <input name="username" required>
-          </div>
-          <div class="form-row">
-            <label>Пароль</label>
-            <input name="password" type="password" required>
-          </div>
-          <div class="btnRow">
-            <button class="menuButs xs" type="submit">Войти</button>
-          </div>
+          <div class="form-row"><label>Username</label><input name="username" required></div>
+          <div class="form-row"><label>Пароль</label><input name="password" type="password" required></div>
+          <div class="btnRow"><button class="menuButs xs" type="submit">Войти</button></div>
         </form>
       </div>
-
       <div id="a-register" class="pane">
         <form id="registerForm">
-          <div class="form-row">
-            <label>Username</label>
-            <input name="username" required>
-          </div>
-          <div class="form-row">
-            <label>Email</label>
-            <input name="email" type="email">
-          </div>
-          <div class="form-row">
-            <label>Никнейм</label>
-            <input name="login" required>
-          </div>
-          <div class="form-row">
-            <label>Пароль</label>
-            <input name="password" type="password" required>
-          </div>
-          <div class="btnRow">
-            <button class="menuButs xs" type="submit">Зарегистрироваться</button>
-          </div>
+          <div class="form-row"><label>Username</label><input name="username" required></div>
+          <div class="form-row"><label>Email</label><input name="email" type="email"></div>
+          <div class="form-row"><label>Никнейм</label><input name="login" required></div>
+          <div class="form-row"><label>Пароль</label><input name="password" type="password" required></div>
+          <div class="btnRow"><button class="menuButs xs" type="submit">Зарегистрироваться</button></div>
         </form>
       </div>
     </div>
   </div>
 
-  <!-- Модалка приглашения (без кнопки выхода) -->
+  <!-- Приглашение -->
   <div id="inviteModal" class="modal-backdrop">
     <div class="modal">
       <h3 id="inviteText" class="modalTitle">Приглашение в игру</h3>
@@ -273,41 +201,29 @@
     </div>
   </div>
 
-  <!-- Модалка ожидания -->
+  <!-- Ожидание -->
   <div id="waitModal" class="modal-backdrop">
     <div class="modal">
       <div id="waitText" class="modalTitle">Ожидание...</div>
-      <div class="btnRow">
-        <button id="waitCancel" class="menuButs xs danger">Отменить</button>
-      </div>
+      <div class="btnRow"><button id="waitCancel" class="menuButs xs danger">Отменить</button></div>
     </div>
   </div>
 
-  <!-- Модалка результата игры -->
+  <!-- Результат игры -->
   <div id="gameResultModal" class="modal-backdrop">
     <div class="modal game-result-modal">
-      <div class="exit" id="gameResultExit">
-        <div class="exit-in"><div class="exit-txt">ВЫХОД</div></div>
-      </div>
+      <div class="exit" id="gameResultExit"><div class="exit-in"><div class="exit-txt">ВЫХОД</div></div></div>
       <h2 id="resultTitle" class="result-title">Победа!</h2>
-      <div id="resultDetails" class="result-details">
-        <p>Поздравляем с победой!</p>
-      </div>
-      <div id="ratingChange" class="rating-change">
-        Рейтинг: +100 очков
-      </div>
+      <div id="resultDetails" class="result-details"><p>Поздравляем с победой!</p></div>
+      <div id="ratingChange" class="rating-change">Рейтинг: +100 очков</div>
     </div>
   </div>
 
-  <!-- Модалка паузы -->
+  <!-- Пауза -->
   <div id="pauseModal" class="modal-backdrop">
     <div class="modal pause-modal">
       <h3 class="modalTitle">Пауза</h3>
-      <div class="pause-info">
-        Доступные паузы:
-        <div>Короткая (1 мин): Доступна</div>
-        <div>Длинная (3 мин): Доступна</div>
-      </div>
+      <div class="pause-info">Доступные паузы:</div>
       <div class="btnRow">
         <button id="shortPauseBtn" class="menuButs xs">Короткая (1 мин)</button>
         <button id="longPauseBtn" class="menuButs xs">Длинная (3 мин)</button>
@@ -322,7 +238,7 @@
   <div id="pauseModalOverlay" class="pause-modal-overlay" style="display: none;">
     <div class="pause-modal-content">
       <h2>ПАУЗА</h2>
-            <div id="pauseTimer" class="pause-timer">0:00</div>
+      <div id="pauseTimer" class="pause-timer">0:00</div>
       <div id="pauseInfo" class="pause-info">Игра приостановлена</div>
       <div id="pauseControls" style="display: none;">
         <button id="cancelPauseBtn2" class="menuButs xs">Снять паузу</button>
