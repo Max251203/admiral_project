@@ -112,6 +112,18 @@ class AutoSetup(APIView):
         eng = Engine(st.data)
         me = _actor(g, request.user)
         
+        # Очищаем текущую расстановку для данного игрока
+        board = st.data.get("board", {})
+        for key in list(board.keys()):
+            x, y = map(int, key.split(","))
+            pieces = board[key]
+            if pieces and pieces[0].get("owner") == me:
+                del board[key]
+        
+        # Сбрасываем счетчики расстановки
+        if str(me) in st.data.get("setup_counts", {}):
+            st.data["setup_counts"][str(me)] = {}
+        
         # Определяем зону расстановки
         rows = list(range(10, 15)) if me == 1 else list(range(0, 5))
         cols = list(range(0, 14))
@@ -345,6 +357,7 @@ class AirAPI(APIView):
             return Response({"ok": True, "res": res, "state": st.data})
         except ValueError as e:
             return Response({"error": str(e)}, status=400)
+
 class BombAPI(APIView):
     permission_classes = [IsAuthenticated]
     def post(self, request, game_id):
@@ -441,6 +454,7 @@ class PauseAPI(APIView):
         
         g.status = "PAUSED"
         g.pause_until = now + timezone.timedelta(seconds=pause_duration)
+        g.pause_initiator = me  # Сохраняем кто инициировал паузу
         
         # Отмечаем использованную паузу
         if me == 1:
@@ -470,8 +484,6 @@ class PauseAPI(APIView):
             "pause_until": g.pause_until.isoformat(),
             "duration": pause_duration
         })
-
-# game/api/views.py - исправление в ResignAPI
 
 class ResignAPI(APIView):
     permission_classes = [IsAuthenticated]
@@ -620,6 +632,7 @@ class GameTimers(APIView):
                     "turn": g.turn,
                     "paused": True,
                     "pause_left": pause_left,
+                    "pause_initiator": g.pause_initiator,  # Добавляем информацию о том, кто инициировал паузу
                     **pauses_info
                 })
         
@@ -627,7 +640,7 @@ class GameTimers(APIView):
         if g.status not in ("TURN_P1", "TURN_P2"):
             return Response({
                 "turn": g.turn,
-                "finished": g.status == "FINISHED",
+                                "finished": g.status == "FINISHED",
                 "winner": g.winner_id,
                 "reason": g.win_reason,
                 **pauses_info
@@ -654,7 +667,7 @@ class GameTimers(APIView):
                 # Проверяем окончание времени
                 if bank <= 0:
                     g.status = "FINISHED"
-                    g.winner = g.player2 if g.turn == 1 else g.player1
+                    g.winner_id = g.player2_id if g.turn == 1 else g.player1_id
                     g.win_reason = "time"
                     g.turn_deadline_at = None
                     g.save()
@@ -696,14 +709,7 @@ class GameTimers(APIView):
             "bank_left": bank // 1000,
             **pauses_info
         })
-    
-class UpdateStats(APIView):
-    permission_classes = [IsAuthenticated]
-    def post(self, request):
-        # Этот метод можно использовать для обновления статистики игрока
-        # Но основное обновление происходит при завершении игры
-        return Response({"ok": True})
-        
+
 # Добавить новый API endpoint для отмены паузы
 class CancelPauseAPI(APIView):
     permission_classes = [IsAuthenticated]
@@ -717,6 +723,9 @@ class CancelPauseAPI(APIView):
         # Проверяем, что пауза была инициирована этим игроком
         if g.status != "PAUSED":
             return Response({"error": "game not paused"}, status=400)
+        
+        if g.pause_initiator != me:
+            return Response({"error": "only pause initiator can cancel it"}, status=400)
         
         # Возвращаемся к игре
         g.status = f"TURN_P{g.turn}"

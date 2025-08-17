@@ -91,7 +91,8 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
                     return {
                         "turn": g.turn,
                         "paused": True,
-                        "pause_left": pause_left
+                        "pause_left": pause_left,
+                        "pause_initiator": g.pause_initiator  # Добавляем информацию о том, кто инициировал паузу
                     }
             
             # Если игра не активна, не тикаем
@@ -127,7 +128,7 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
             # Проверяем окончание времени
             if bank <= 0:
                 g.status = "FINISHED"
-                g.winner = g.player2 if g.turn == 1 else g.player1
+                g.winner_id = g.player2_id if g.turn == 1 else g.player1_id
                 g.win_reason = "time"
                 g.turn_deadline_at = None
                 

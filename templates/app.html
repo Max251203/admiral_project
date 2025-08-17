@@ -79,15 +79,24 @@
                       </div>
                     </div>
                     <div class="lists">
-                      <ul id="usersList" class="list"></ul>
+                      <div class="scrollable-container">
+                        <ul id="usersList" class="list"></ul>
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 <div id="pane-friends" class="pane">
                   <div class="lobbyContent">
+                    <div class="settBox">
+                      <div class="search">
+                        <input id="friendSearch" placeholder="Поиск друзей...">
+                      </div>
+                    </div>
                     <div class="lists">
-                      <ul id="friendsList" class="list"></ul>
+                      <div class="scrollable-container">
+                        <ul id="friendsList" class="list"></ul>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -118,6 +127,14 @@
                   <div class="controls-panel">
                     <h3>Управление</h3>
                     <div id="controlsContainer"></div>
+                    
+                    <div class="killed-section">
+                      <h3>Убитые фишки</h3>
+                      <table class="killed-table">
+                        <thead><tr><th>Тип</th><th>Убито</th><th>Всего</th></tr></thead>
+                        <tbody id="killedTableBody"></tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -140,7 +157,7 @@
       <div class="avatarBox">
         <img id="pAvatarPreview" class="avatarLarge" src="{% static 'img/avatar_stub.png' %}" alt="avatar">
         <label for="pAvatar" class="menuButs xs">Сменить аватар</label>
-        <input id="pAvatar" type="file" accept="image/*" style="display:none;">
+                <input id="pAvatar" type="file" accept="image/*" style="display:none;">
       </div>
       <div class="tabbar">
         <button class="tab active" data-pane="p-info">Данные</button>
@@ -206,6 +223,15 @@
     <div class="modal">
       <div id="waitText" class="modalTitle">Ожидание...</div>
       <div class="btnRow"><button id="waitCancel" class="menuButs xs danger">Отменить</button></div>
+    </div>
+  </div>
+
+  <!-- Ожидание соперника -->
+  <div id="waitOpponentModal" class="modal-backdrop">
+    <div class="modal">
+      <h3 class="modalTitle">Ожидание соперника</h3>
+      <p class="text-center">Пожалуйста, подождите пока соперник завершит расстановку фишек.</p>
+      <div id="setupTimerDisplay" class="pause-timer">15:00</div>
     </div>
   </div>
 

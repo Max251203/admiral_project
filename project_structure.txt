@@ -10848,6 +10848,7 @@
     ├── forms.py
     ├── migrations
         ├── 0001_initial.py
+        ├── 0002_alter_profile_rating_elo.py
         ├── __init__.py
     ├── models.py
     ├── serializers.py
@@ -10879,6 +10880,10 @@
     ├── migrations
         ├── 0001_initial.py
         ├── 0002_remove_game_pause_until_remove_game_pauses_long_p1_and_more.py
+        ├── 0003_game_long_pause_p1_game_long_pause_p2_and_more.py
+        ├── 0004_remove_game_pause_until.py
+        ├── 0005_game_pause_until.py
+        ├── 0006_game_pause_initiator.py
         ├── __init__.py
     ├── models.py
     ├── rules
@@ -10927,16 +10932,16 @@
 ├── runtime.txt
 ├── static
     ├── css
-        └── style.css
+        ├── style.css
+        └── svg
     ├── fonts
         ├── Boomboom.otf
         ├── README.txt
         └── README.txt)
     ├── img
         └── menu_bg.jpg
-    ├── js
+    └── js
         └── app.js
-    └── svg
 ├── templates
     ├── app.html
     ├── match

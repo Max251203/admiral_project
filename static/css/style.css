@@ -162,11 +162,13 @@ main{
   display:flex; align-items:center; gap:.6rem; background:transparent;
   border:.12vw solid #fff; border-radius:2rem; padding:.35rem .8rem;
   color:#fff; cursor:pointer; font-family:Arial, sans-serif;
+  height: 38px;
 }
 .logout-btn {
   display:flex; align-items:center; justify-content:center;
   background:transparent; border:.12vw solid #c23b3b; border-radius:2rem;
   padding:.35rem .8rem; color:#ffb3b3; cursor:pointer; font-family:Arial, sans-serif;
+  height: 38px;
 }
 .avatar{ width:30px; height:30px; border-radius:50%; object-fit:cover; border:2px solid #fff; }
 #profileName{ font-weight:normal; }
@@ -213,21 +215,79 @@ main{
 .rules p{ margin-bottom:0.8rem; line-height:1.4; }
 
 /* Лобби */
-.lobbyContent{ width:100%; height:100%; display:flex; flex-direction:column; gap:1rem; align-items:center; padding-top:1rem; }
-.settBox{ display:flex; align-items:center; justify-content:space-between; width:100%; padding:.8rem; border:.12vw solid #80e4ff; border-radius:1.5rem; background:rgba(0,0,0,.3); gap:1rem; }
+.lobbyContent{ 
+  width:100%; 
+  height:100%; 
+  display:flex; 
+  flex-direction:column; 
+  gap:1rem; 
+  align-items:center; 
+  padding-top:1rem; 
+}
+.settBox{ 
+  display:flex; 
+  align-items:center; 
+  justify-content:space-between; 
+  width:100%; 
+  padding:.8rem; 
+  border:.12vw solid #80e4ff; 
+  border-radius:1.5rem; 
+  background:rgba(0,0,0,.3); 
+  gap:1rem; 
+}
 
 /* Поиск */
-.search{ display:flex; align-items:center; justify-content:space-between; width:100%; }
-.search input{ padding:.5rem .7rem; border:.12vw solid #fff; border-radius:1rem; background:rgba(0,0,0,.55); color:#fff; flex:1; font-family:Arial, sans-serif; }
-.search-buttons { display:flex; gap:.4rem; }
+.search{ 
+  display:flex; 
+  align-items:center; 
+  justify-content:space-between; 
+  width:100%; 
+}
+.search input{ 
+  padding:.5rem .7rem; 
+  border:.12vw solid #fff; 
+  border-radius:1rem; 
+  background:rgba(0,0,0,.55); 
+  color:#fff; 
+  flex:1; 
+  font-family:Arial, sans-serif; 
+}
+.search-buttons { 
+  display:flex; 
+  gap:.4rem; 
+}
 
 /* Списки */
-.lists{ width:100%; flex:1; overflow:hidden; margin-top:1rem; height:calc(100% - 100px); }
+.lists{ 
+  width:100%; 
+  flex:1; 
+  overflow:hidden; 
+  margin-top:1rem; 
+  height:calc(100% - 100px); 
+}
+
+/* Скроллируемый контейнер для списков */
+.scrollable-container {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  border:.12vw solid #fff; 
+  border-radius:1rem;
+  background:rgba(0,0,0,.5);
+}
+
 .list{
-  list-style:none; margin:0; padding:0;
-  border:.12vw solid #fff; border-radius:1rem;
-  background:rgba(0,0,0,.5); height:100%; overflow-y:auto;
-  scrollbar-width:thin; scrollbar-color:#80e4ff #222;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 8px; /* отступ для скролла */
+  bottom: 0;
+  list-style:none; 
+  margin:0; 
+  padding:0;
+  overflow-y:auto;
+  scrollbar-width:thin;
+  scrollbar-color:#80e4ff #222;
 }
 .list::-webkit-scrollbar{ width:8px; }
 .list::-webkit-scrollbar-track{ background:linear-gradient(45deg, #222, #333); border-radius:10px; margin:6px 0; }
@@ -239,55 +299,199 @@ main{
 .list li.me{ background:rgba(255,255,0,.1); border:1px solid rgba(255,255,0,.3); }
 
 /* Панели игры */
-.gameContent{ width:100%; height:100%; display:grid; grid-template-columns: 80px 1fr 80px; grid-template-rows: auto 1fr; gap:.8rem; padding:1rem; }
-.game-hud{ grid-column: 1 / -1; display:flex; gap:.6rem; justify-content:center; margin-bottom:.5rem; }
-.tag{ display:inline-flex; align-items:center; padding:.3rem .6rem; border:.12vw solid #fff; border-radius:.9rem; background:rgba(0,0,0,.45); font-size:.9rem; }
+.gameContent{ 
+  width:100%; 
+  height:100%; 
+  display:grid; 
+  grid-template-columns: 150px 1fr 150px; 
+  grid-template-rows: auto 1fr; 
+  gap:5px; 
+  padding:5px; 
+}
+.game-hud{ 
+  grid-column: 1 / -1; 
+  display:flex; 
+  gap:.6rem; 
+  justify-content:center; 
+  margin-bottom:.5rem; 
+}
+.tag{ 
+  display:inline-flex; 
+  align-items:center; 
+  padding:.3rem .6rem; 
+  border:.12vw solid #fff; 
+  border-radius:.9rem; 
+  background:rgba(0,0,0,.45); 
+  font-size:.9rem; 
+}
 
 /* Левая панель — флот */
 .ships-panel{
-  display:flex; flex-direction:column; gap:.5rem;
-  border:.12vw solid #80e4ff; border-radius:1rem;
-  background:rgba(0,0,0,.3); padding:1rem; 
-  height:100%; overflow-y:auto;
-  scrollbar-width:thin; scrollbar-color:#80e4ff #222;
+  display:flex; 
+  flex-direction:column;
+  border:.12vw solid #80e4ff; 
+  border-radius:1rem;
+  background:rgba(0,0,0,.3); 
+  height:100%; 
+  overflow:hidden;
+  position: relative;
 }
-.ships-panel::-webkit-scrollbar{ width:8px; }
-.ships-panel::-webkit-scrollbar-track{ background:linear-gradient(45deg, #222, #333); border-radius:10px; margin:6px 0; }
-.ships-panel::-webkit-scrollbar-thumb{ background:linear-gradient(45deg, #80e4ff, #27e881); border-radius:10px; border:2px solid #222; }
-.ships-panel::-webkit-scrollbar-thumb:hover{ background:linear-gradient(45deg, #27e881, #80e4ff); box-shadow:0 0 10px rgba(128,228,255,0.5); }
-.ships-panel h3{ text-align:center; margin-bottom:1rem; color:#80e4ff; }
-.ship-item { padding:.5rem; text-align:center; cursor:pointer; transition:all .3s; text-shadow:0 0 5px rgba(255,255,255,.5); margin-bottom:.5rem; }
+.ships-panel h3{ 
+  text-align:center; 
+  margin:10px 0; 
+  color:#80e4ff; 
+  padding:0 10px;
+}
+.ships-panel-inner {
+  position: absolute;
+  top: 40px;
+  left: 0;
+  right: 8px; /* отступ для скролла */
+  bottom: 0;
+  overflow-y: auto;
+  padding: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: #80e4ff #222;
+}
+.ships-panel-inner::-webkit-scrollbar{ width:8px; }
+.ships-panel-inner::-webkit-scrollbar-track{ background:linear-gradient(45deg, #222, #333); border-radius:10px; margin:6px 0; }
+.ships-panel-inner::-webkit-scrollbar-thumb{ background:linear-gradient(45deg, #80e4ff, #27e881); border-radius:10px; border:2px solid #222; }
+.ships-panel-inner::-webkit-scrollbar-thumb:hover{ background:linear-gradient(45deg, #27e881, #80e4ff); box-shadow:0 0 10px rgba(128,228,255,0.5); }
+.ship-item { 
+  padding:.5rem; 
+  text-align:center; 
+  cursor:pointer; 
+  transition:all .3s; 
+  text-shadow:0 0 5px rgba(255,255,255,.5); 
+  margin-bottom:.5rem; 
+  font-size: 0.9rem;
+}
 .ship-item:hover { text-shadow:0 0 10px rgba(255,255,255,1); }
 .ship-item.selected { text-shadow:0 0 15px rgba(255,255,0,1); color:#ffff00; }
 .ship-count { font-size:.7rem; opacity:.8; margin-left:.5rem; }
 
 /* Правая панель — управление */
 .controls-panel{
-  display:flex; flex-direction:column; gap:1rem;
-  border:.12vw solid #ff5e2c; border-radius:1rem;
-  background:rgba(0,0,0,.3); padding:1rem; 
-  height:100%;
+  display:flex; 
+  flex-direction:column;
+  border:.12vw solid #ff5e2c; 
+  border-radius:1rem;
+  background:rgba(0,0,0,.3); 
+  height:100%; 
+  overflow:hidden;
+  position: relative;
 }
-.controls-panel h3{ text-align:center; margin-bottom:1rem; color:#ff5e2c; font-size:.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.control-button { padding:.7rem .5rem; text-align:center; cursor:pointer; border:.12vw solid #ff5e2c; border-radius:.6rem; background:rgba(255,94,44,.2); transition:all .3s; margin-bottom:.5rem; position:relative; }
+.controls-panel h3{ 
+  text-align:center; 
+  margin:10px 0; 
+  color:#ff5e2c; 
+  padding:0 10px;
+  font-size:.9rem; 
+  white-space:nowrap; 
+  overflow:hidden; 
+  text-overflow:ellipsis; 
+}
+.controls-panel-inner {
+  position: absolute;
+  top: 40px;
+  left: 0;
+  right: 8px; /* отступ для скролла */
+  bottom: 60%; /* Верхние 60% для управления */
+  overflow-y: auto;
+  padding: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: #80e4ff #222;
+}
+.controls-panel-inner::-webkit-scrollbar{ width:8px; }
+.controls-panel-inner::-webkit-scrollbar-track{ background:linear-gradient(45deg, #222, #333); border-radius:10px; margin:6px 0; }
+.controls-panel-inner::-webkit-scrollbar-thumb{ background:linear-gradient(45deg, #80e4ff, #27e881); border-radius:10px; border:2px solid #222; }
+.controls-panel-inner::-webkit-scrollbar-thumb:hover{ background:linear-gradient(45deg, #27e881, #80e4ff); box-shadow:0 0 10px rgba(128,228,255,0.5); }
+
+/* Нижняя часть правой панели - убитые фишки */
+.killed-section {
+  position: absolute;
+  top: 40%;
+  left: 0;
+  right: 8px;
+  bottom: 0;
+  overflow-y: auto;
+  padding: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: #80e4ff #222;
+}
+.killed-section::-webkit-scrollbar{ width:8px; }
+.killed-section::-webkit-scrollbar-track{ background:linear-gradient(45deg, #222, #333); border-radius:10px; margin:6px 0; }
+.killed-section::-webkit-scrollbar-thumb{ background:linear-gradient(45deg, #80e4ff, #27e881); border-radius:10px; border:2px solid #222; }
+.killed-section::-webkit-scrollbar-thumb:hover{ background:linear-gradient(45deg, #27e881, #80e4ff); box-shadow:0 0 10px rgba(128,228,255,0.5); }
+
+.control-item { 
+  padding:.7rem .5rem; 
+  text-align:center; 
+  cursor:pointer; 
+  transition:all .3s; 
+  margin-bottom:.5rem; 
+  position:relative; 
+  font-size: 0.9rem;
+  text-shadow: 0 0 5px rgba(255,94,44,.5);
+}
+.control-item:hover { 
+  text-shadow: 0 0 10px rgba(255,94,44,1); 
+}
+.control-item.selected { 
+  text-shadow: 0 0 15px rgba(255,255,0,1);
+  color: #ffff00;
+}
+.control-button { 
+  padding:.7rem .5rem; 
+  text-align:center; 
+  cursor:pointer; 
+  border:.12vw solid #ff5e2c; 
+  border-radius:.6rem; 
+  background:rgba(255,94,44,.2); 
+  transition:all .3s; 
+  margin-bottom:.5rem; 
+  position:relative; 
+  font-size: 0.9rem;
+}
 .control-button:hover { background:rgba(255,94,44,.3); box-shadow:0 0 10px rgba(255,94,44,.5); }
 .control-button.selected { border-color:#ffff00; box-shadow:0 0 15px rgba(255,255,0,.7); }
 .control-button .tooltip { position:absolute; top:-40px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); color:white; padding:5px 10px; border-radius:5px; font-size:12px; white-space:nowrap; opacity:0; visibility:hidden; transition:opacity .3s, visibility .3s; z-index:100; }
 .control-button:hover .tooltip { opacity:1; visibility:visible; }
 
 /* Игровое поле */
-.board-container { width:100%; height:100%; display:flex; justify-content:center; align-items:center; overflow:hidden; }
+.board-container { 
+  width:100%; 
+  height:100%; 
+  display:flex; 
+  justify-content:center; 
+  align-items:center; 
+  overflow:hidden; 
+}
 .board{
-  width:100%; height:0; padding-bottom:100%;
-  display:grid; grid-template-columns:repeat(14, 1fr); grid-template-rows:repeat(15, 1fr);
-  gap:1px; border:.12vw solid #80e4ff; background: linear-gradient(315deg,#4dff03,#00d0ff);
-  position:relative; max-width:70vh; max-height:70vh;
+  width:100%; 
+  height:0; 
+  padding-bottom:100%;
+  display:grid; 
+  grid-template-columns:repeat(14, 1fr); 
+  grid-template-rows:repeat(15, 1fr);
+  gap:1px; 
+  border:.12vw solid #80e4ff; 
+  background: linear-gradient(315deg,#4dff03,#00d0ff);
+  position:relative; 
+  max-width:min(100%, calc(100vh - 100px)); 
+  max-height:min(100%, calc(100vh - 100px));
+  aspect-ratio: 14/15;
 }
 .board .cell{
-  width:100%; height:0; padding-bottom:100%;
+  width:100%; 
+  height:100%; 
   background:rgba(8,70,104,.66);
-  display:flex; align-items:center; justify-content:center;
-  cursor:pointer; transition:background .2s; position:relative;
+  display:flex; 
+  align-items:center; 
+  justify-content:center;
+  cursor:pointer; 
+  transition:background .2s; 
+  position:relative;
 }
 .board .cell:hover{ background:rgba(8,70,104,.8); }
 .board .cell.selected{ background:rgba(255,255,0,.5); }
@@ -297,17 +501,34 @@ main{
 .board .cell.enemy-zone{ background:rgba(255,100,0,.2); }
 .board .cell.group-selected { box-shadow: inset 0 0 0 3px #ffff00; }
 .board .piece{
-  position:absolute; top:5%; left:5%; width:90%; height:90%;
-  display:flex; align-items:center; justify-content:center;
-  font-weight:800; letter-spacing:.5px; font-size:clamp(6px,1vw,12px);
+  position:absolute; 
+  top:5%; 
+  left:5%; 
+  width:90%; 
+  height:90%;
+  display:flex; 
+  align-items:center; 
+  justify-content:center;
+  font-weight:800; 
+  letter-spacing:.5px; 
+  font-size:clamp(6px,1vw,12px);
   border-radius:5px;
 }
 
 /* Уничтоженные */
 .board .piece.destroyed::after{
-  content:'✕'; position:absolute; top:0; left:0; right:0; bottom:0;
-  display:flex; align-items:center; justify-content:center;
-  color:#ff0000; font-size:1.5em; font-weight:bold;
+  content:'✕'; 
+  position:absolute; 
+  top:0; 
+  left:0; 
+  right:0; 
+  bottom:0;
+  display:flex; 
+  align-items:center; 
+  justify-content:center;
+  color:#ff0000; 
+  font-size:1.5em; 
+  font-weight:bold;
   background:rgba(255,0,0,.2);
 }
 
@@ -326,6 +547,23 @@ main{
 .kindМ,.kindСМ{background:#6e7b85; color:#fff;}
 .kindТН{background:#d35400; color:#fff;}
 .kindВМБ{background:#95a5a6; color:#000;}
+
+/* Таблица убитых фишек */
+.killed-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+}
+.killed-table th, .killed-table td {
+  padding: 0.3rem;
+  text-align: center;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.killed-table th {
+  color: #80e4ff;
+  font-weight: bold;
+}
 
 /* Модалки-оверлеи */
 .modal-backdrop{ position:fixed; inset:0; background:#0009; display:none; align-items:center; justify-content:center; z-index:50; }
@@ -346,11 +584,29 @@ main{
 .btnRow{ display:flex; gap:.8rem; align-items:center; justify-content:center; margin-top:1rem; flex-wrap:wrap; }
 
 /* История игр */
-.history-container{ height:380px; width:calc(100% - 16px); border:.12vw solid #fff; border-radius:1rem; background:rgba(0,0,0,.5); overflow:hidden; flex:1; margin:0 8px; position:relative; }
+.history-container{ 
+  height:380px; 
+  width:calc(100% - 16px); 
+  border:.12vw solid #fff; 
+  border-radius:1rem; 
+  background:rgba(0,0,0,.5); 
+  overflow:hidden; 
+  flex:1; 
+  margin:0 8px; 
+  position:relative; 
+}
 .history-list{
-  position:absolute; top:0; left:0; right:8px; bottom:0; /* правый отступ под скролл */
-  overflow-y:auto; list-style:none; margin:0; padding:0;
-  scrollbar-width:thin; scrollbar-color:#80e4ff #222;
+  position:absolute; 
+  top:0; 
+  left:0; 
+  right:8px; 
+  bottom:0; /* правый отступ под скролл */
+  overflow-y:auto; 
+  list-style:none; 
+  margin:0; 
+  padding:0;
+  scrollbar-width:thin; 
+  scrollbar-color:#80e4ff #222;
 }
 .history-list::-webkit-scrollbar{ width:8px; }
 .history-list::-webkit-scrollbar-track{ background:linear-gradient(45deg, #222, #333); border-radius:10px; margin:6px 0; }
@@ -386,19 +642,42 @@ main{
 .notification-title{ font-weight:bold; margin-bottom:.5rem; }
 .notification-message{ font-size:.9rem; opacity:.9; }
 
+/* Анимация перемещения фишки */
+@keyframes movePiece {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(var(--move-x), var(--move-y)); }
+}
+.piece-moving {
+  animation: movePiece 0.5s forwards;
+}
+
+/* Вкладки в лобби и игре */
+#pane-quick, #pane-friends {
+  width: 100%;
+  height: 100%;
+  display: none;
+  flex-direction: column;
+}
+
+#pane-quick.active, #pane-friends.active {
+  display: flex;
+}
+
 /* Адаптив */
 @media (max-width: 1200px){
   #msWrap{ width:60%; }
   #menuHead{ font-size:9vw; }
   .menuButs{ font-size:2.5vw; }
-  .gameContent{ grid-template-columns: 80px 1fr 80px; }
+  .gameContent{ grid-template-columns: 160px 1fr 160px; }
+  .ship-item, .control-item, .control-button { font-size: 0.85rem; }
 }
 @media (max-width: 900px){
   #msWrap{ width:80%; }
   #menuHead{ font-size:10vw; }
   .menuButs{ font-size:3vw; width:70%; }
   .search input{ min-width:150px; }
-  .gameContent{ grid-template-columns: 70px 1fr 70px; }
+  .gameContent{ grid-template-columns: 140px 1fr 140px; }
+  .ship-item, .control-item, .control-button { font-size: 0.8rem; }
 }
 @media (max-width: 600px){
   #msWrap{ width:95%; height:95%; }
