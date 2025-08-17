@@ -85,12 +85,12 @@
                 <div id="pane-quick" class="pane active">
                   <div class="lobbyContent">
                     <div class="settBox">
-                      <label>Поиск игроков:</label>
                       <div class="search">
                         <input id="userSearch" placeholder="Поиск по никнейму...">
-                        <button id="searchBtn" class="menuButs xs">Найти</button>
-                        <button id="quickBtn" class="menuButs xs">Случайный</button>
-                        <button id="showMeBtn" class="menuButs xs">Показать меня</button>
+                        <div class="search-buttons">
+                          <button id="quickBtn" class="menuButs xs">Случайный</button>
+                          <button id="showMeBtn" class="menuButs xs">Показать меня</button>
+                        </div>
                       </div>
                     </div>
 
@@ -128,7 +128,7 @@
 
                   <!-- Левая панель - корабли -->
                   <div class="ships-panel">
-                    <h3>Корабли</h3>
+                    <h3>Флот</h3>
                     <div id="shipsContainer">
                       <!-- Корабли будут добавлены через JS -->
                     </div>
@@ -260,7 +260,7 @@
             <label>Пароль</label>
             <input name="password" type="password" required>
           </div>
-          <div class="btnRow">
+                    <div class="btnRow">
             <button class="menuButs xs" type="submit">Зарегистрироваться</button>
           </div>
         </form>
@@ -306,17 +306,25 @@
   </div>
 
   <!-- Модалка паузы -->
-  <div id="pauseModal" class="modal-backdrop">
-    <div class="modal">
-      <h3 class="modalTitle">Пауза</h3>
-      <div class="btnRow">
+    <div id="pauseModal" class="modal-backdrop">
+    <div class="modal pause-modal">
+        <h3 class="modalTitle">Пауза</h3>
+        <div class="pause-info">
+        Доступные паузы:
+        <div>Короткая (1 мин): Доступна</div>
+        <div>Длинная (3 мин): Доступна</div>
+        </div>
+        <div class="btnRow">
         <button id="shortPauseBtn" class="menuButs xs">Короткая (1 мин)</button>
         <button id="longPauseBtn" class="menuButs xs">Длинная (3 мин)</button>
+        </div>
+        <div class="btnRow">
         <button id="cancelPauseBtn" class="menuButs xs danger">Отмена</button>
-      </div>
+        </div>
     </div>
-  </div>
+    </div>
 
   <script src="{% static 'js/app.js' %}"></script>
 </body>
 </html>
+            

@@ -68,6 +68,32 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
             g = Game.objects.select_for_update().get(id=self.game_id)
             now = timezone.now()
             
+            # Если игра завершена, не тикаем
+            if g.status == "FINISHED":
+                return {
+                    "turn": g.turn, 
+                    "finished": True,
+                    "winner": g.winner_id if g.winner_id else None,
+                    "reason": g.win_reason
+                }
+            
+            # Если игра на паузе, проверяем не закончилась ли пауза
+            if g.status == "PAUSED" and g.pause_until:
+                if now >= g.pause_until:
+                    # Пауза закончилась, возвращаемся к игре
+                    g.status = f"TURN_P{g.turn}"
+                    g.pause_until = None
+                    g.turn_deadline_at = now + timezone.timedelta(seconds=30)
+                    g.save()
+                else:
+                    # Пауза еще активна
+                    pause_left = int((g.pause_until - now).total_seconds())
+                    return {
+                        "turn": g.turn,
+                        "paused": True,
+                        "pause_left": pause_left
+                    }
+            
             # Если игра не активна, не тикаем
             if g.status not in ("TURN_P1", "TURN_P2"):
                 return {
@@ -104,6 +130,28 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
                 g.winner = g.player2 if g.turn == 1 else g.player1
                 g.win_reason = "time"
                 g.turn_deadline_at = None
+                
+                # Обновляем статистику игроков
+                winner = g.player2 if g.turn == 1 else g.player1
+                loser = g.player1 if g.turn == 1 else g.player2
+                
+                winner.profile.wins += 1
+                winner.profile.rating_elo += 100
+                winner.profile.save()
+                
+                loser.profile.losses += 1
+                loser.profile.rating_elo = max(0, loser.profile.rating_elo - 100)
+                loser.profile.save()
+                
+                # Обновляем состояние игры
+                try:
+                    st = GameState.objects.get(game=g)
+                    st.data["phase"] = "FINISHED"
+                    st.data["winner"] = 2 if g.turn == 1 else 1
+                    st.data["win_reason"] = "time"
+                    st.save()
+                except GameState.DoesNotExist:
+                    pass
             
             g.last_tick_at = now
             g.save()

@@ -1,11 +1,8 @@
 Django>=5.0
 djangorestframework
-channels[daphne]>=4.0
-channels-redis
 psycopg[binary]>=3.1
 Pillow
 whitenoise
 django-cors-headers
 dj-database-url
 python-dotenv
-redis

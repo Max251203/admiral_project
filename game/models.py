@@ -15,10 +15,16 @@ class Game(models.Model):
     bank_ms_p1 = models.IntegerField(default=15*60*1000)
     bank_ms_p2 = models.IntegerField(default=15*60*1000)
     
-
     setup_deadline_at = models.DateTimeField(null=True, blank=True)
     turn_deadline_at = models.DateTimeField(null=True, blank=True)
     last_tick_at = models.DateTimeField(null=True, blank=True)
+    
+    # Паузы
+    pause_until = models.DateTimeField(null=True, blank=True)
+    short_pause_p1 = models.BooleanField(default=False)
+    long_pause_p1 = models.BooleanField(default=False)
+    short_pause_p2 = models.BooleanField(default=False)
+    long_pause_p2 = models.BooleanField(default=False)
 
     ready_p1 = models.BooleanField(default=False)
     ready_p2 = models.BooleanField(default=False)

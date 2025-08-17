@@ -9,7 +9,7 @@ class Profile(models.Model):
     login = models.CharField(max_length=32, unique=True)
     avatar = models.ImageField(upload_to=avatar_upload_to, blank=True, null=True)
     bio = models.CharField(max_length=240, blank=True, default="")
-    rating_elo = models.IntegerField(default=1200)
+    rating_elo = models.IntegerField(default=0)  # Начальный рейтинг 0
     wins = models.IntegerField(default=0)
     losses = models.IntegerField(default=0)
     

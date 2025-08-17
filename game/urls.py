@@ -2,9 +2,8 @@ from django.urls import path
 from .views import room
 from .api.views import (
     GetState, SetupAPI, SubmitSetup, AutoSetup,
-    MoveAPI, TorpedoAPI, AirAPI, BombAPI, ResignAPI,
-    GameByCode, MyGames
-    # Убрали PauseAPI
+    MoveAPI, TorpedoAPI, AirAPI, BombAPI, ResignAPI, PauseAPI,
+    GameByCode, MyGames, UpdateStats, GameTimers
 )
 
 urlpatterns = [
@@ -17,8 +16,10 @@ urlpatterns = [
     path("air/<uuid:game_id>/", AirAPI.as_view(), name="game_air"),
     path("bomb/<uuid:game_id>/", BombAPI.as_view(), name="game_bomb"),
     path("resign/<uuid:game_id>/", ResignAPI.as_view(), name="game_resign"),
-    # Убрали path("pause/<uuid:game_id>/", PauseAPI.as_view(), name="game_pause"),
+    path("pause/<uuid:game_id>/", PauseAPI.as_view(), name="game_pause"),
+    path("timers/<uuid:game_id>/", GameTimers.as_view(), name="game_timers"),
     path("by-code/<str:code>/", GameByCode.as_view(), name="game_by_code"),
     path("my/", MyGames.as_view(), name="my_games"),
+    path("update_stats/", UpdateStats.as_view(), name="update_stats"),
     path("r/<str:code>/", room, name="room"),
 ]

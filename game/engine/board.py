@@ -81,7 +81,7 @@ class Engine:
             raise ValueError("cell occupied")
         
         # Проверяем лимиты фишек
-        current_count = self.gd.setup_counts[owner].get(kind, 0)
+        current_count = self.gd.setup_counts.get(owner, {}).get(kind, 0)
         max_counts = {
             "BDK": 2, "KR": 6, "A": 1, "S": 1, "TN": 1, "L": 2, "ES": 6,
             "M": 6, "SM": 1, "F": 6, "TK": 6, "T": 6, "TR": 6, "ST": 6,
@@ -92,6 +92,11 @@ class Engine:
             raise ValueError(f"too many {kind}")
         
         self._set(coord, [Piece(owner=owner, kind=kind)])
+        
+        # Инициализируем словарь для владельца, если его нет
+        if owner not in self.gd.setup_counts:
+            self.gd.setup_counts[owner] = {}
+            
         self.gd.setup_counts[owner][kind] = current_count + 1
 
     def _collect_group(self, origin: Coord, owner: int, kind: str) -> List[Tuple[Coord, Piece]]:
@@ -359,11 +364,11 @@ class Engine:
         x, y = s_coord
         
         for _ in range(5):
+            y += dy
             if not self._in_bounds((x, y)):
                 break
             if self._get((x, y)):
                 self._kill((x, y), res)
-            y += dy
         
         self._set(s_coord, [])
         self.gd.turn = 2 if self.gd.turn == 1 else 1

@@ -80,7 +80,9 @@ const App = {
     selectedCells: [],
     attackMode: false,
     setupPhase: true,
-    shipCounts: {}
+    shipCounts: {},
+    pausesUsed: { short: false, long: false },
+    selectedGroup: [] // Для выбора групп кораблей
   },
   selectedCell: null,
   draggedPiece: null
@@ -108,7 +110,6 @@ const quickBtn = document.getElementById('quickBtn');
 const showMeBtn = document.getElementById('showMeBtn');
 
 const userSearch = document.getElementById('userSearch');
-const searchBtn = document.getElementById('searchBtn');
 const usersList = document.getElementById('usersList');
 const friendsList = document.getElementById('friendsList');
 
@@ -347,10 +348,6 @@ if(registerForm) {
 }
 
 // ===== Users/Friends =====
-if(searchBtn) {
-  searchBtn.addEventListener('click', () => loadUsers(userSearch.value.trim()));
-}
-
 if(userSearch) {
   userSearch.addEventListener('input', () => loadUsers(userSearch.value.trim()));
 }
@@ -358,7 +355,9 @@ if(userSearch) {
 if(showMeBtn) {
   showMeBtn.addEventListener('click', () => {
     if(!App.isAuth) return;
-    const myItem = usersList.querySelector('.me');
+    
+    // Находим себя в списке
+    const myItem = usersList.querySelector(`[data-login="${App.meLogin}"]`);
     if(myItem) {
       myItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
       myItem.style.background = 'rgba(255,255,0,.3)';
@@ -370,7 +369,7 @@ if(showMeBtn) {
 }
 
 function calculateRating(wins, losses) {
-  return 1200 + (wins * 100) - (losses * 100);
+  return wins * 100 - losses * 100; // Начальный рейтинг 0
 }
 
 async function loadUsers(q){
@@ -386,37 +385,68 @@ async function loadUsers(q){
 function renderUsers(arr){
   if(!usersList) return;
   
-  // Добавляем себя в список если авторизованы
-  if(App.isAuth && App.meLogin) {
-    const meData = {
-      id: 'me',
-      login: App.meLogin,
-      wins: 0, // Можно получить из API
-      losses: 0,
-      rating: 1200
-    };
-    arr.unshift(meData);
+  // Получаем данные о себе
+  let meData = null;
+  if(App.isAuth) {
+    api('/accounts/api/me/').then(me => {
+      meData = {
+        id: me.id,
+        login: App.meLogin,
+        username: me.username,
+        rating: me.rating_elo || 0,
+        wins: me.wins || 0,
+        losses: me.losses || 0
+      };
+      
+      // Добавляем себя в список
+      const allUsers = [...arr];
+      if(meData) {
+        allUsers.push(meData);
+      }
+      
+      // Сортируем по рейтингу
+      allUsers.sort((a, b) => {
+        const ratingA = calculateRating(a.wins || 0, a.losses || 0);
+        const ratingB = calculateRating(b.wins || 0, b.losses || 0);
+        return ratingB - ratingA;
+      });
+      
+      renderUsersList(allUsers);
+    }).catch(() => {
+      // Если не удалось получить данные о себе, просто отображаем список
+      renderUsersList(arr);
+    });
+  } else {
+    // Сортируем по рейтингу
+    arr.sort((a, b) => {
+      const ratingA = calculateRating(a.wins || 0, a.losses || 0);
+      const ratingB = calculateRating(b.wins || 0, b.losses || 0);
+      return ratingB - ratingA;
+    });
+    
+    renderUsersList(arr);
   }
+}
+
+function renderUsersList(arr) {
+  usersList.innerHTML = '';
   
-  // Сортируем по рейтингу
-  arr.sort((a, b) => calculateRating(b.wins, b.losses) - calculateRating(a.wins, a.losses));
-  
-  usersList.innerHTML='';
-  if(arr.length===0){ 
-    usersList.innerHTML='<li>Пусто</li>'; 
+  if(arr.length === 0){ 
+    usersList.innerHTML = '<li>Пусто</li>'; 
     return; 
   }
   
   arr.forEach((u, index) => {
-    const rating = calculateRating(u.wins, u.losses);
-    const isMe = u.id === 'me' || (App.isAuth && u.login === App.meLogin);
+    const rating = calculateRating(u.wins || 0, u.losses || 0);
+    const isMe = App.isAuth && u.login === App.meLogin;
     
     const li = document.createElement('li');
     li.className = isMe ? 'me' : '';
+    li.dataset.login = u.login;
     li.innerHTML = `
       <div>
         <strong>#${index + 1} ${u.login}</strong> ${isMe ? '(Вы)' : ''}<br>
-        <span class="muted">Рейтинг: ${rating} • Побед: ${u.wins} • Поражений: ${u.losses}</span>
+        <span class="muted">Рейтинг: ${rating} • Побед: ${u.wins || 0} • Поражений: ${u.losses || 0}</span>
       </div>
       ${!isMe ? `<div style="display:flex;gap:.4rem">
         <button class="menuButs xs" data-invite="${u.id}">Пригласить</button>
@@ -646,7 +676,7 @@ function createShipButtons() {
     
     const button = document.createElement('div');
     button.className = 'ship-button';
-    button.style.backgroundColor = shipData.color;
+    button.style.color = shipData.color;
     button.dataset.ship = type;
     button.innerHTML = `<span>${type}</span>`;
     
@@ -667,7 +697,7 @@ function selectShip(type) {
   if(App.game.shipCounts[type] <= 0) return;
   
   // Убираем выделение с других кораблей
-  document.querySelectorAll('.ship-button').forEach(btn => {
+    document.querySelectorAll('.ship-button').forEach(btn => {
     btn.classList.remove('selected');
   });
   
@@ -677,11 +707,15 @@ function selectShip(type) {
     button.classList.add('selected');
     App.game.selectedShip = type;
     App.game.selectedWeapon = null;
+    App.game.selectedGroup = [];
     
     // Убираем выделение с оружия
     document.querySelectorAll('.weapon-button').forEach(btn => {
       btn.classList.remove('selected');
     });
+    
+    // Убираем выделение с клеток
+    clearGroupSelection();
   }
 }
 
@@ -703,7 +737,25 @@ function selectWeapon(type) {
     App.game.selectedWeapon = type;
     App.game.selectedShip = null;
     App.game.attackMode = true;
+    App.game.selectedGroup = [];
+    
+    // Убираем выделение с клеток
+    clearGroupSelection();
   }
+}
+
+function clearGroupSelection() {
+  // Убираем выделение с клеток группы
+  document.querySelectorAll('.cell.group-selected').forEach(cell => {
+    cell.classList.remove('group-selected');
+  });
+  
+  // Убираем индикаторы группы
+  document.querySelectorAll('.group-indicator').forEach(indicator => {
+    indicator.remove();
+  });
+  
+  App.game.selectedGroup = [];
 }
 
 function clearBoard(){
@@ -719,8 +771,13 @@ function clearBoard(){
       cell.dataset.y = r;
       
       // Добавляем зоны
-      if(r >= 10) cell.classList.add('my-zone');
-      else if(r < 5) cell.classList.add('enemy-zone');
+      if(App.game.myPlayer === 1) {
+        if(r >= 10) cell.classList.add('my-zone');
+        else if(r < 5) cell.classList.add('enemy-zone');
+      } else {
+        if(r < 5) cell.classList.add('my-zone');
+        else if(r >= 10) cell.classList.add('enemy-zone');
+      }
       
       cell.addEventListener('click', handleCellClick);
       cell.addEventListener('dragover', handleDragOver);
@@ -731,7 +788,7 @@ function clearBoard(){
 }
 
 function handleCellClick(e) {
-  const cell = e.target;
+  const cell = e.currentTarget;
   const x = parseInt(cell.dataset.x);
   const y = parseInt(cell.dataset.y);
   
@@ -742,14 +799,153 @@ function handleCellClick(e) {
     // Режим атаки
     handleWeaponAttack(x, y, App.game.selectedWeapon);
   } else if(!App.game.setupPhase) {
-    // Обычный ход
-    handleMove(x, y);
+    // Проверяем, чей сейчас ход
+    if(App.game.state.turn !== App.game.myPlayer) {
+      showNotification('Ошибка', 'Сейчас не ваш ход', 'error');
+      return;
+    }
+    
+    // Проверяем, есть ли в клетке фишка
+    const piece = cell.querySelector('.piece');
+    
+    if(piece && parseInt(piece.dataset.owner) === App.game.myPlayer) {
+      // Если это наша фишка, добавляем её в группу или выбираем для хода
+      const pieceKind = piece.dataset.kind;
+      
+      // Проверяем, что фишка не неподвижная
+      const immobileTypes = ['VMB', 'SM'];
+      if(immobileTypes.includes(pieceKind)) {
+        showNotification('Ошибка', 'Этот корабль неподвижен', 'error');
+        return;
+      }
+      
+      // Если группа пуста, начинаем новую группу
+      if(App.game.selectedGroup.length === 0) {
+        App.game.selectedGroup.push({x, y, kind: pieceKind});
+        cell.classList.add('group-selected');
+        
+        // Добавляем индикатор группы
+        const indicator = document.createElement('div');
+        indicator.className = 'group-indicator';
+        cell.appendChild(indicator);
+        
+        // Если это не первая фишка в группе, проверяем, что она того же типа
+      } else if(App.game.selectedGroup.length < 3) {
+        const firstPiece = App.game.selectedGroup[0];
+        
+        // Проверяем, что фишка того же типа
+        if(pieceKind !== firstPiece.kind) {
+          showNotification('Ошибка', 'В группу можно добавлять только фишки одного типа', 'error');
+          return;
+        }
+        
+        // Проверяем, что фишка находится рядом с другой фишкой группы
+        let isAdjacent = false;
+        for(const groupPiece of App.game.selectedGroup) {
+          const dx = Math.abs(x - groupPiece.x);
+          const dy = Math.abs(y - groupPiece.y);
+          if(dx + dy === 1) {
+            isAdjacent = true;
+            break;
+          }
+        }
+        
+        if(!isAdjacent) {
+          showNotification('Ошибка', 'Фишка должна быть рядом с другой фишкой группы', 'error');
+          return;
+        }
+        
+        // Проверяем, что фишка еще не в группе
+        const alreadyInGroup = App.game.selectedGroup.some(p => p.x === x && p.y === y);
+        if(alreadyInGroup) {
+          showNotification('Ошибка', 'Эта фишка уже в группе', 'error');
+          return;
+        }
+        
+        // Добавляем фишку в группу
+        App.game.selectedGroup.push({x, y, kind: pieceKind});
+        cell.classList.add('group-selected');
+        
+        // Добавляем индикатор группы
+        const indicator = document.createElement('div');
+        indicator.className = 'group-indicator';
+        cell.appendChild(indicator);
+      } else {
+        showNotification('Информация', 'Группа может содержать максимум 3 фишки', 'info');
+      }
+    } else if(App.game.selectedGroup.length > 0) {
+      // Если клетка пуста и у нас есть выбранная группа, пытаемся сделать ход
+      handleGroupMove(x, y);
+    } else {
+      // Обычный ход
+      handleMove(x, y);
+    }
+  }
+}
+
+async function handleGroupMove(x, y) {
+  // Проверяем, что клетка находится рядом с одной из фишек группы
+  let isAdjacent = false;
+  for(const groupPiece of App.game.selectedGroup) {
+    const dx = Math.abs(x - groupPiece.x);
+    const dy = Math.abs(y - groupPiece.y);
+    if(dx + dy === 1) {
+      isAdjacent = true;
+      break;
+    }
+  }
+  
+  if(!isAdjacent) {
+    showNotification('Ошибка', 'Группа может двигаться только на соседнюю клетку', 'error');
+    return;
+  }
+  
+  // Пытаемся переместить группу
+  try {
+    // Перемещаем первую фишку группы
+    const firstPiece = App.game.selectedGroup[0];
+    const res = await api(`/game/move/${App.game.id}/`, 'POST', {
+      src: [firstPiece.x, firstPiece.y],
+      dst: [x, y],
+      followers: App.game.selectedGroup.slice(1).map(p => [p.x, p.y, x, y])
+    });
+    
+    if(res.state) {
+      App.game.state = res.state;
+      renderGame();
+      clearGroupSelection();
+      
+      // Показываем результат хода
+      if(res.res && res.res.event) {
+        let message = 'Группа перемещена';
+        switch(res.res.event) {
+          case 'move': message = 'Группа перемещена'; break;
+          case 'def_win': message = 'Ваша группа уничтожена'; break;
+          case 'exchange': message = 'Обмен ударами, обе группы уничтожены'; break;
+          case 'mine_boom': message = 'Ваша группа подорвалась на мине'; break;
+          case 'mine_swept': message = 'Мина обезврежена тральщиком'; break;
+          case 'tanker_boom': message = 'Танкер взорвался'; break;
+          case 'ab_explode': message = 'Атомный взрыв!'; break;
+        }
+        showNotification('Результат', message, 'success');
+      }
+    }
+  } catch(err) {
+    showNotification('Ошибка', 'Не удалось переместить группу: ' + err.message, 'error');
+    clearGroupSelection();
   }
 }
 
 async function placeShip(x, y, shipType) {
   // Проверяем зону расстановки
-  if(y < 10) {
+  let validZone = false;
+  if(App.game.myPlayer === 1 && y >= 10) {
+    validZone = true;
+  } else if(App.game.myPlayer === 2 && y < 5) {
+    validZone = true;
+  }
+  
+  if(!validZone) {
     showNotification('Ошибка', 'Можно расставлять только в своей зоне', 'error');
     return;
   }
@@ -764,7 +960,7 @@ async function placeShip(x, y, shipType) {
       placements: [{
         x: x,
         y: y,
-        kind: shipType
+        kind: convertToApiShipType(shipType)
       }]
     });
     
@@ -776,8 +972,28 @@ async function placeShip(x, y, shipType) {
       showNotification('Успех', `${shipType} размещен`, 'success');
     }
   } catch(err) {
-    showNotification('Ошибка', 'Не удалось разместить корабль', 'error');
+    showNotification('Ошибка', 'Не удалось разместить корабль: ' + err.message, 'error');
   }
+}
+
+// Конвертирует русские обозначения кораблей в английские для API
+function convertToApiShipType(shipType) {
+  const map = {
+    'БДК': 'BDK', 'КР': 'KR', 'А': 'A', 'С': 'S', 'ТН': 'TN', 'Л': 'L', 'ЭС': 'ES',
+    'М': 'M', 'СМ': 'SM', 'Ф': 'F', 'ТК': 'TK', 'Т': 'T', 'ТР': 'TR', 'СТ': 'ST',
+    'ПЛ': 'PL', 'КРПЛ': 'KRPL', 'АБ': 'AB', 'ВМБ': 'VMB'
+  };
+  return map[shipType] || shipType;
+}
+
+// Конвертирует английские обозначения кораблей в русские для отображения
+function convertFromApiShipType(shipType) {
+  const map = {
+    'BDK': 'БДК', 'KR': 'КР', 'A': 'А', 'S': 'С', 'TN': 'ТН', 'L': 'Л', 'ES': 'ЭС',
+    'M': 'М', 'SM': 'СМ', 'F': 'Ф', 'TK': 'ТК', 'T': 'Т', 'TR': 'ТР', 'ST': 'СТ',
+    'PL': 'ПЛ', 'KRPL': 'КРПЛ', 'AB': 'АБ', 'VMB': 'ВМБ'
+  };
+  return map[shipType] || shipType;
 }
 
 function updateShipCounts() {
@@ -790,6 +1006,12 @@ function updateShipCounts() {
 }
 
 async function handleWeaponAttack(x, y, weaponType) {
+  // Проверяем, чей сейчас ход
+  if(App.game.state.turn !== App.game.myPlayer) {
+    showNotification('Ошибка', 'Сейчас не ваш ход', 'error');
+    return;
+  }
+  
   try {
     let res;
     
@@ -797,12 +1019,28 @@ async function handleWeaponAttack(x, y, weaponType) {
       case 'torpedo':
         if(!App.game.selectedCells.length) {
           // Первый клик - выбираем торпеду
+          const cell = getCellElement(x, y);
+          const piece = cell.querySelector('.piece');
+          
+          if(!piece || piece.dataset.kind !== 'T' || parseInt(piece.dataset.owner) !== App.game.myPlayer) {
+            showNotification('Ошибка', 'Выберите свою торпеду (Т)', 'error');
+            return;
+          }
+          
           App.game.selectedCells.push({x, y, type: 'torpedo'});
           highlightCell(x, y, 'selected');
-          showNotification('Торпедная атака', 'Теперь выберите торпедный катер', 'info');
+          showNotification('Торпедная атака', 'Теперь выберите торпедный катер (ТК)', 'info');
           return;
-        } else if(App.game.selectedCells.length === 1) {
+                } else if(App.game.selectedCells.length === 1) {
           // Второй клик - выбираем катер
+          const cell = getCellElement(x, y);
+          const piece = cell.querySelector('.piece');
+          
+          if(!piece || piece.dataset.kind !== 'TK' || parseInt(piece.dataset.owner) !== App.game.myPlayer) {
+            showNotification('Ошибка', 'Выберите свой торпедный катер (ТК)', 'error');
+            return;
+          }
+          
           App.game.selectedCells.push({x, y, type: 'tk'});
           highlightCell(x, y, 'selected');
           
@@ -815,12 +1053,28 @@ async function handleWeaponAttack(x, y, weaponType) {
       case 'air':
         if(!App.game.selectedCells.length) {
           // Первый клик - выбираем авианосец
+          const cell = getCellElement(x, y);
+          const piece = cell.querySelector('.piece');
+          
+          if(!piece || piece.dataset.kind !== 'A' || parseInt(piece.dataset.owner) !== App.game.myPlayer) {
+            showNotification('Ошибка', 'Выберите свой авианосец (А)', 'error');
+            return;
+          }
+          
           App.game.selectedCells.push({x, y, type: 'carrier'});
           highlightCell(x, y, 'selected');
-          showNotification('Воздушная атака', 'Теперь выберите самолет', 'info');
+          showNotification('Воздушная атака', 'Теперь выберите самолет (С)', 'info');
           return;
         } else {
-          // Второй клик - выбираем самолет и атакуем
+          // Второй клик - выбираем самолет
+          const cell = getCellElement(x, y);
+          const piece = cell.querySelector('.piece');
+          
+          if(!piece || piece.dataset.kind !== 'S' || parseInt(piece.dataset.owner) !== App.game.myPlayer) {
+            showNotification('Ошибка', 'Выберите свой самолет (С)', 'error');
+            return;
+          }
+          
           const carrier = App.game.selectedCells[0];
           res = await api(`/game/air/${App.game.id}/`, 'POST', {
             a: [carrier.x, carrier.y],
@@ -831,6 +1085,14 @@ async function handleWeaponAttack(x, y, weaponType) {
         
       case 'bomb':
         // Атомная бомба - сразу взрыв
+        const cell = getCellElement(x, y);
+        const piece = cell.querySelector('.piece');
+        
+        if(!piece || piece.dataset.kind !== 'AB' || parseInt(piece.dataset.owner) !== App.game.myPlayer) {
+          showNotification('Ошибка', 'Выберите свою атомную бомбу (АБ)', 'error');
+          return;
+        }
+        
         res = await api(`/game/bomb/${App.game.id}/`, 'POST', {
           ab: [x, y]
         });
@@ -846,7 +1108,7 @@ async function handleWeaponAttack(x, y, weaponType) {
     }
     
   } catch(err) {
-    showNotification('Ошибка', 'Не удалось выполнить атаку', 'error');
+    showNotification('Ошибка', 'Не удалось выполнить атаку: ' + err.message, 'error');
     clearSelection();
   }
 }
@@ -923,7 +1185,7 @@ async function fireTorpedo(torpedo, tk, direction) {
       animateTorpedoPath(torpedo, direction);
     }
   } catch(err) {
-    showNotification('Ошибка', 'Не удалось выстрелить торпедой', 'error');
+    showNotification('Ошибка', 'Не удалось выстрелить торпедой: ' + err.message, 'error');
     clearSelection();
   }
 }
@@ -1007,18 +1269,45 @@ function clearSelection() {
 }
 
 async function handleMove(x, y) {
+  // Проверяем, чей сейчас ход
+  if(App.game.state.turn !== App.game.myPlayer) {
+    showNotification('Ошибка', 'Сейчас не ваш ход', 'error');
+    return;
+  }
+  
   // Обычное перемещение кораблей
   if(!App.game.selectedCells.length) {
     // Выбираем корабль для перемещения
     const cell = getCellElement(x, y);
-    if(cell && cell.querySelector('.piece')) {
-      App.game.selectedCells.push({x, y});
-      highlightCell(x, y, 'selected');
-      showValidMoves(x, y);
+    const piece = cell.querySelector('.piece');
+    
+    if(!piece || parseInt(piece.dataset.owner) !== App.game.myPlayer) {
+      showNotification('Ошибка', 'Выберите свой корабль', 'error');
+      return;
     }
+    
+    // Проверяем, что корабль не неподвижный
+    const immobileTypes = ['VMB', 'SM'];
+    if(immobileTypes.includes(piece.dataset.kind)) {
+      showNotification('Ошибка', 'Этот корабль неподвижен', 'error');
+      return;
+    }
+    
+    App.game.selectedCells.push({x, y});
+    highlightCell(x, y, 'selected');
+    showValidMoves(x, y);
   } else {
     // Перемещаем корабль
     const from = App.game.selectedCells[0];
+    
+    // Проверяем, что выбрана допустимая клетка для хода
+    const cell = getCellElement(x, y);
+    if(!cell.classList.contains('valid-move')) {
+      showNotification('Ошибка', 'Недопустимый ход', 'error');
+      clearSelection();
+      return;
+    }
+    
     try {
       const res = await api(`/game/move/${App.game.id}/`, 'POST', {
         src: [from.x, from.y],
@@ -1029,10 +1318,24 @@ async function handleMove(x, y) {
         App.game.state = res.state;
         renderGame();
         clearSelection();
-        showNotification('Ход выполнен', 'Корабль перемещен', 'success');
+        
+        // Показываем результат хода
+        if(res.res && res.res.event) {
+          let message = 'Ход выполнен';
+          switch(res.res.event) {
+            case 'move': message = 'Корабль перемещен'; break;
+            case 'def_win': message = 'Ваш корабль уничтожен'; break;
+            case 'exchange': message = 'Обмен ударами, оба корабля уничтожены'; break;
+            case 'mine_boom': message = 'Ваш корабль подорвался на мине'; break;
+            case 'mine_swept': message = 'Мина обезврежена тральщиком'; break;
+            case 'tanker_boom': message = 'Танкер взорвался'; break;
+            case 'ab_explode': message = 'Атомный взрыв!'; break;
+          }
+          showNotification('Результат', message, 'success');
+        }
       }
     } catch(err) {
-      showNotification('Ошибка', 'Не удалось переместить корабль', 'error');
+      showNotification('Ошибка', 'Не удалось переместить корабль: ' + err.message, 'error');
       clearSelection();
     }
   }
@@ -1042,26 +1345,104 @@ function showValidMoves(x, y) {
   // Показываем возможные ходы (соседние клетки)
   const directions = [{dx:1,dy:0}, {dx:-1,dy:0}, {dx:0,dy:1}, {dx:0,dy:-1}];
   
-  directions.forEach(dir => {
-    const newX = x + dir.dx;
-    const newY = y + dir.dy;
-    
-    if(newX >= 0 && newX < 14 && newY >= 0 && newY < 15) {
-      highlightCell(newX, newY, 'valid-move');
-    }
-  });
+  // Проверяем, является ли выбранный корабль торпедным катером (ТК)
+  const cell = getCellElement(x, y);
+  const piece = cell.querySelector('.piece');
+  const isTorpedoBoat = piece && piece.dataset.kind === 'TK';
+  
+  // Для ТК показываем ходы на 2 клетки
+  if(isTorpedoBoat) {
+    directions.forEach(dir => {
+      // Ход на 1 клетку
+      let newX = x + dir.dx;
+      let newY = y + dir.dy;
+      
+      if(newX >= 0 && newX < 14 && newY >= 0 && newY < 15) {
+        highlightCell(newX, newY, 'valid-move');
+      }
+      
+      // Ход на 2 клетки
+      newX = x + dir.dx * 2;
+      newY = y + dir.dy * 2;
+      
+      if(newX >= 0 && newX < 14 && newY >= 0 && newY < 15) {
+        highlightCell(newX, newY, 'valid-move');
+      }
+    });
+  } else {
+    // Для остальных кораблей - только на 1 клетку
+    directions.forEach(dir => {
+      const newX = x + dir.dx;
+      const newY = y + dir.dy;
+      
+      if(newX >= 0 && newX < 14 && newY >= 0 && newY < 15) {
+        highlightCell(newX, newY, 'valid-move');
+      }
+    });
+  }
 }
 
 function labelKind(kind){
-  const map = {
-    "BDK":"БДК","KR":"КР","A":"А","S":"С","TN":"ТН","L":"Л","ES":"ЭС","M":"М","SM":"СМ","F":"Ф",
-    "TK":"ТК","T":"Т","TR":"ТР","ST":"СТ","PL":"ПЛ","KRPL":"КРПЛ","AB":"АБ","VMB":"ВМБ"
-  };
-  return map[kind] || kind;
+  return convertFromApiShipType(kind);
 }
 
 function classKind(kind){
-  return 'kind' + labelKind(kind);
+  return 'kind' + convertFromApiShipType(kind);
+}
+
+// Функция для обновления состояния игры через AJAX вместо WebSockets
+function startGamePolling() {
+  if(App.game.pollTimer) clearInterval(App.game.pollTimer);
+  
+  App.game.pollTimer = setInterval(async () => {
+    if(!App.game.id) return;
+    
+    try {
+      // Получаем состояние игры
+      const d = await api(`/game/state/${App.game.id}/`);
+      if(d.state) {
+        const oldPhase = App.game.state?.phase;
+        App.game.state = d.state;
+        
+        // Проверяем смену фазы
+        if(oldPhase === 'SETUP' && d.state.phase !== 'SETUP') {
+          App.game.setupPhase = false;
+          showNotification('Игра началась!', 'Фаза расстановки завершена', 'success');
+          
+          // Удаляем кнопку подтверждения расстановки
+          const submitButton = shipsContainer.parentElement.querySelector('.menuButs.xs');
+          if(submitButton && submitButton.textContent === 'Готово') {
+            submitButton.remove();
+          }
+        }
+        
+        renderGame();
+        
+        // Проверяем окончание игры
+        if(d.state.winner) {
+          showGameResult(d.state.winner, d.state.win_reason);
+        }
+      }
+      
+      // Получаем информацию о таймерах
+      const timerData = await api(`/game/timers/${App.game.id}/`);
+      if(timerData) {
+        updateTimers(timerData);
+        
+        // Обновляем информацию о доступных паузах
+        App.game.pausesUsed.short = !timerData.short_available;
+        App.game.pausesUsed.long = !timerData.long_available;
+        
+        // Проверяем окончание игры
+        if(timerData.finished && timerData.winner) {
+          showGameResult(timerData.winner, timerData.reason);
+        }
+      }
+      
+    } catch(err) {
+      console.error('Ошибка поллинга игры:', err);
+    }
+  }, 1000); // Обновляем каждую секунду
 }
 
 async function startGameByRoomUrl(url){
@@ -1072,6 +1453,8 @@ async function startGameByRoomUrl(url){
     App.game.state = d.state;
     App.game.myPlayer = d.my_player;
     App.game.setupPhase = d.state.phase === 'SETUP';
+    App.game.pausesUsed = { short: false, long: false };
+    App.game.selectedGroup = [];
     
     initializeShipCounts();
     startGamePolling();
@@ -1085,46 +1468,38 @@ async function startGameByRoomUrl(url){
       btn.addEventListener('click', () => selectWeapon(btn.dataset.weapon));
     });
     
+    // Добавляем кнопку подтверждения расстановки
+    if(App.game.setupPhase) {
+      const submitButton = document.createElement('button');
+      submitButton.className = 'menuButs xs';
+      submitButton.textContent = 'Готово';
+      submitButton.style.margin = '1rem auto';
+      submitButton.addEventListener('click', submitSetup);
+      shipsContainer.parentElement.appendChild(submitButton);
+    }
+    
   }catch(err){ 
-    showNotification('Ошибка', 'Не удалось открыть игру', 'error');
+    showNotification('Ошибка', 'Не удалось открыть игру: ' + err.message, 'error');
   }
 }
 
-function startGamePolling(){
-  if(App.game.pollTimer) clearInterval(App.game.pollTimer);
-  
-  App.game.pollTimer = setInterval(async () => {
-    if(!App.game.id) return;
-    
-    try{
-      const d = await api(`/game/state/${App.game.id}/`);
-      if(d.state){
-        const oldPhase = App.game.state?.phase;
-        App.game.state = d.state;
-        
-        // Проверяем смену фазы
-        if(oldPhase === 'SETUP' && d.state.phase !== 'SETUP') {
-          App.game.setupPhase = false;
-          showNotification('Игра началась!', 'Фаза расстановки завершена', 'success');
-        }
-        
+async function submitSetup() {
+  try {
+    const res = await api(`/game/submit_setup/${App.game.id}/`, 'POST', {});
+    if(res.ok) {
+      showNotification('Готово', 'Расстановка подтверждена. Ожидаем соперника...', 'success');
+      
+      // Если оба игрока готовы, игра начинается
+      if(res.status !== 'SETUP') {
+        App.game.setupPhase = false;
+        App.game.state.phase = res.status;
+        App.game.state.turn = res.turn;
         renderGame();
-        
-        // Проверяем окончание игры
-        if(d.state.winner) {
-          showGameResult(d.state.winner, d.state.win_reason);
-        }
       }
-      
-      updateTimers({
-        turn_left: 30,
-        bank_left: 900
-      });
-      
-    }catch(err){
-      console.error('Ошибка поллинга игры:', err);
     }
-  }, 2000);
+  } catch(err) {
+    showNotification('Ошибка', 'Не удалось подтвердить расстановку: ' + err.message, 'error');
+  }
 }
 
 function updateTimers(data){
@@ -1135,6 +1510,18 @@ function updateTimers(data){
     const minutes = Math.floor(data.bank_left / 60);
     const seconds = data.bank_left % 60;
     hudBank.textContent = minutes + ':' + String(seconds).padStart(2, '0');
+  }
+  
+  // Обновляем индикатор хода
+  if(turnIndicator && data.turn !== undefined) {
+    const isMyTurn = data.turn === App.game.myPlayer;
+    turnIndicator.textContent = isMyTurn ? 'Ваш ход' : 'Ход соперника';
+    turnIndicator.style.color = isMyTurn ? '#27e881' : '#ff5e2c';
+  }
+  
+  // Если игра на паузе, показываем таймер паузы
+  if(data.paused && data.pause_left) {
+    hudTimer.textContent = `Пауза: ${data.pause_left}s`;
   }
 }
 
@@ -1158,16 +1545,27 @@ function renderGame(){
     
     if(cell && pieces && pieces.length > 0){
       const p = pieces[0];
+      
+      // В фазе расстановки показываем только свои фишки
+      if(App.game.setupPhase && p.owner !== App.game.myPlayer) {
+        return;
+      }
+      
+      // В фазе игры показываем только свои фишки и уничтоженные фишки противника
+      if(!App.game.setupPhase && p.owner !== App.game.myPlayer && p.alive) {
+        return;
+      }
+      
       const span = document.createElement('span');
+      span.className = `piece owner${p.owner} ${classKind(p.kind)}`;
       span.textContent = labelKind(p.kind);
-            span.className = `piece owner${p.owner} ${classKind(p.kind)}`;
-      span.draggable = (!App.game.setupPhase && p.owner === App.game.myPlayer);
+      span.draggable = (!App.game.setupPhase && p.owner === App.game.myPlayer && p.alive);
       span.addEventListener('dragstart', handleDragStart);
       span.dataset.kind = p.kind;
       span.dataset.owner = p.owner;
       
       // Добавляем крестик для уничтоженных кораблей
-      if(p.destroyed) {
+      if(!p.alive) {
         span.classList.add('destroyed');
       }
       
@@ -1183,31 +1581,83 @@ function showGameResult(winner, reason) {
   }
   
   const isWinner = winner === App.game.myPlayer;
-  const ratingChange = isWinner ? 100 : -100;
   
-  resultTitle.textContent = isWinner ? 'Победа!' : 'Поражение';
-  resultTitle.className = `result-title ${isWinner ? 'victory' : 'defeat'}`;
-  
-  let reasonText = '';
-  switch(reason) {
-    case 'bases': reasonText = 'Уничтожены военно-морские базы'; break;
-    case 'moves': reasonText = 'Уничтожены все движущиеся корабли'; break;
-    case 'time': reasonText = 'Закончилось время'; break;
-    case 'resign': reasonText = 'Противник сдался'; break;
-    default: reasonText = 'Игра завершена';
+  // Получаем текущий рейтинг пользователя
+  api('/accounts/api/me/').then(me => {
+    const currentRating = me.rating_elo || 0;
+    const ratingChange = isWinner ? 100 : -100;
+    const newRating = currentRating + ratingChange;
+    
+    resultTitle.textContent = isWinner ? 'Победа!' : 'Поражение';
+    resultTitle.className = `result-title ${isWinner ? 'victory' : 'defeat'}`;
+    
+    let reasonText = '';
+    switch(reason) {
+      case 'bases': reasonText = 'Уничтожены военно-морские базы'; break;
+      case 'moves': reasonText = 'Уничтожены все движущиеся корабли'; break;
+      case 'time': reasonText = 'Закончилось время'; break;
+      case 'resign': reasonText = 'Противник сдался'; break;
+      default: reasonText = 'Игра завершена';
+    }
+    
+    resultDetails.innerHTML = `<p>${reasonText}</p>`;
+    
+    if(currentRating > 0 || ratingChange > 0) {
+      ratingChange.textContent = `Рейтинг: ${ratingChange > 0 ? '+' : ''}${ratingChange} очков (${newRating})`;
+      ratingChange.className = `rating-change ${ratingChange > 0 ? 'positive' : 'negative'}`;
+    } else {
+      ratingChange.textContent = '';
+    }
+    
+    // Обновляем статистику игрока
+    updatePlayerStats(isWinner);
+    
+    gameResultModal.style.display = 'flex';
+  }).catch(err => {
+    // Если не удалось получить данные о рейтинге, просто показываем результат
+    resultTitle.textContent = isWinner ? 'Победа!' : 'Поражение';
+    resultTitle.className = `result-title ${isWinner ? 'victory' : 'defeat'}`;
+    
+    let reasonText = '';
+    switch(reason) {
+      case 'bases': reasonText = 'Уничтожены военно-морские базы'; break;
+      case 'moves': reasonText = 'Уничтожены все движущиеся корабли'; break;
+      case 'time': reasonText = 'Закончилось время'; break;
+      case 'resign': reasonText = 'Противник сдался'; break;
+      default: reasonText = 'Игра завершена';
+    }
+    
+    resultDetails.innerHTML = `<p>${reasonText}</p>`;
+    ratingChange.textContent = '';
+    
+    // Обновляем статистику игрока
+    updatePlayerStats(isWinner);
+    
+    gameResultModal.style.display = 'flex';
+  });
+}
+
+async function updatePlayerStats(isWinner) {
+  try {
+    // Здесь можно добавить API для обновления статистики
+    // Например, отправить запрос на сервер с результатом игры
+    await api('/accounts/api/update_stats/', 'POST', { 
+      win: isWinner 
+    });
+  } catch(err) {
+    console.error('Ошибка обновления статистики:', err);
   }
-  
-  resultDetails.innerHTML = `<p>${reasonText}</p>`;
-  
-  ratingChange.textContent = `Рейтинг: ${ratingChange > 0 ? '+' : ''}${ratingChange} очков`;
-  ratingChange.className = `rating-change ${ratingChange > 0 ? 'positive' : 'negative'}`;
-  
-  gameResultModal.style.display = 'flex';
 }
 
 // ===== Drag & Drop =====
 function handleDragStart(e){
   if(App.game.setupPhase) return;
+  
+  // Проверяем, чей сейчас ход
+  if(App.game.state.turn !== App.game.myPlayer) {
+    e.preventDefault();
+    return;
+  }
   
   App.draggedPiece = {
     element: e.target,
@@ -1217,6 +1667,9 @@ function handleDragStart(e){
     owner: parseInt(e.target.dataset.owner)
   };
   e.dataTransfer.effectAllowed = 'move';
+  
+  // Показываем возможные ходы
+  showValidMoves(App.draggedPiece.fromX, App.draggedPiece.fromY);
 }
 
 function handleDragOver(e){
@@ -1228,8 +1681,15 @@ async function handleDrop(e){
   e.preventDefault();
   if(!App.draggedPiece) return;
   
-  const toX = parseInt(e.target.dataset.x);
-  const toY = parseInt(e.target.dataset.y);
+  const toX = parseInt(e.currentTarget.dataset.x);
+  const toY = parseInt(e.currentTarget.dataset.y);
+  
+  // Проверяем, что выбрана допустимая клетка для хода
+  if(!e.currentTarget.classList.contains('valid-move')) {
+    clearSelection();
+    App.draggedPiece = null;
+    return;
+  }
   
   try{
     const res = await api(`/game/move/${App.game.id}/`, 'POST', {
@@ -1240,45 +1700,125 @@ async function handleDrop(e){
     if(res.state){
       App.game.state = res.state;
       renderGame();
-      if(res.res && res.res.event){
-        showNotification('Ход выполнен', `Результат: ${res.res.event}`, 'success');
+      
+      // Показываем результат хода
+      if(res.res && res.res.event) {
+        let message = 'Ход выполнен';
+        switch(res.res.event) {
+          case 'move': message = 'Корабль перемещен'; break;
+          case 'def_win': message = 'Ваш корабль уничтожен'; break;
+          case 'exchange': message = 'Обмен ударами, оба корабля уничтожены'; break;
+          case 'mine_boom': message = 'Ваш корабль подорвался на мине'; break;
+          case 'mine_swept': message = 'Мина обезврежена тральщиком'; break;
+          case 'tanker_boom': message = 'Танкер взорвался'; break;
+          case 'ab_explode': message = 'Атомный взрыв!'; break;
+        }
+        showNotification('Результат', message, 'success');
       }
     }
   }catch(err){
     showNotification('Ошибка', 'Ошибка хода: ' + err.message, 'error');
   }
   
+  clearSelection();
   App.draggedPiece = null;
 }
 
 // ===== Game controls =====
 if(pauseBtn) {
   pauseBtn.addEventListener('click', () => {
+    // Проверяем, чей сейчас ход
+    if(App.game.state.turn !== App.game.myPlayer) {
+      showNotification('Ошибка', 'Пауза доступна только в свой ход', 'error');
+      return;
+    }
+    
+    // Проверяем, использованы ли уже паузы
+    if(App.game.pausesUsed.short && App.game.pausesUsed.long) {
+      showNotification('Ошибка', 'Вы уже использовали все доступные паузы', 'error');
+      return;
+    }
+    
+        // Если доступна только одна пауза, используем её сразу
+    if(App.game.pausesUsed.short && !App.game.pausesUsed.long) {
+      activatePause('long');
+      return;
+    }
+    
+    if(!App.game.pausesUsed.short && App.game.pausesUsed.long) {
+      activatePause('short');
+      return;
+    }
+    
+    // Если доступны обе паузы, показываем модальное окно выбора
     pauseModal.style.display = 'flex';
+    
+    // Обновляем информацию о доступных паузах
+    const pauseInfo = document.querySelector('.pause-info');
+    if(!pauseInfo) {
+      const infoDiv = document.createElement('div');
+      infoDiv.className = 'pause-info';
+      infoDiv.textContent = 'Доступные паузы:';
+      
+      const shortInfo = document.createElement('div');
+      shortInfo.textContent = `Короткая (1 мин): ${App.game.pausesUsed.short ? 'Использована' : 'Доступна'}`;
+      
+      const longInfo = document.createElement('div');
+      longInfo.textContent = `Длинная (3 мин): ${App.game.pausesUsed.long ? 'Использована' : 'Доступна'}`;
+      
+      infoDiv.appendChild(shortInfo);
+      infoDiv.appendChild(longInfo);
+      
+      pauseModal.querySelector('.modalTitle').after(infoDiv);
+    } else {
+      pauseInfo.innerHTML = `
+        Доступные паузы:
+        <div>Короткая (1 мин): ${App.game.pausesUsed.short ? 'Использована' : 'Доступна'}</div>
+        <div>Длинная (3 мин): ${App.game.pausesUsed.long ? 'Использована' : 'Доступна'}</div>
+      `;
+    }
   });
 }
 
-if(shortPauseBtn) {
-  shortPauseBtn.addEventListener('click', async () => {
-    try {
-      await api(`/game/pause/${App.game.id}/`, 'POST', { type: 'short' });
-      pauseModal.style.display = 'none';
+async function activatePause(type) {
+  try {
+    await api(`/game/pause/${App.game.id}/`, 'POST', { type });
+    
+    if(type === 'short') {
+      App.game.pausesUsed.short = true;
       showNotification('Пауза', 'Короткая пауза активирована (1 минута)', 'info');
-    } catch(err) {
-      showNotification('Ошибка', 'Не удалось активировать паузу', 'error');
+    } else {
+      App.game.pausesUsed.long = true;
+      showNotification('Пауза', 'Длинная пауза активирована (3 минуты)', 'info');
     }
+    
+    pauseModal.style.display = 'none';
+  } catch(err) {
+    showNotification('Ошибка', 'Не удалось активировать паузу: ' + err.message, 'error');
+  }
+}
+
+if(shortPauseBtn) {
+  shortPauseBtn.addEventListener('click', () => {
+    if(App.game.pausesUsed.short) {
+      showNotification('Ошибка', 'Вы уже использовали короткую паузу', 'error');
+      pauseModal.style.display = 'none';
+      return;
+    }
+    
+    activatePause('short');
   });
 }
 
 if(longPauseBtn) {
-  longPauseBtn.addEventListener('click', async () => {
-    try {
-      await api(`/game/pause/${App.game.id}/`, 'POST', { type: 'long' });
+  longPauseBtn.addEventListener('click', () => {
+    if(App.game.pausesUsed.long) {
+      showNotification('Ошибка', 'Вы уже использовали длинную паузу', 'error');
       pauseModal.style.display = 'none';
-      showNotification('Пауза', 'Длинная пауза активирована (3 минуты)', 'info');
-    } catch(err) {
-      showNotification('Ошибка', 'Не удалось активировать паузу', 'error');
+      return;
     }
+    
+    activatePause('long');
   });
 }
 
@@ -1319,7 +1859,7 @@ if(resignBtn) {
       await api(`/game/resign/${App.game.id}/`, 'POST', {});
       showNotification('Игра окончена', 'Вы сдались', 'info');
     }catch(err){
-      showNotification('Ошибка', 'Ошибка сдачи', 'error');
+      showNotification('Ошибка', 'Ошибка сдачи: ' + err.message, 'error');
     }
   });
 }
@@ -1392,12 +1932,12 @@ async function autoSetup() {
           await api(`/game/submit_setup/${App.game.id}/`, 'POST', {});
           showNotification('Готовность', 'Готовность подтверждена', 'success');
         } catch(err) {
-          showNotification('Ошибка', 'Не удалось подтвердить готовность', 'error');
+          showNotification('Ошибка', 'Не удалось подтвердить готовность: ' + err.message, 'error');
         }
       }, 1000);
     }
   } catch(err) {
-    showNotification('Ошибка', 'Ошибка автоматической расстановки', 'error');
+    showNotification('Ошибка', 'Ошибка автоматической расстановки: ' + err.message, 'error');
   }
 }
 

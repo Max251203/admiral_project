@@ -205,15 +205,18 @@ main{
 
 /* Правила - исправленные размеры */
 .rules{
-  text-align:left; padding:1rem; height:calc(100% - 4rem); overflow-y:auto; 
+  text-align:left; padding:1rem; 
+  height:calc(100% - 5rem); /* Уменьшаем высоту */
+  overflow-y:auto; 
   border:.12vw solid #fff; border-radius:1rem; background:rgba(0,0,0,.3); 
-  width:100%; margin-top:1rem;
+  width:calc(100% - 16px); /* Отступ от границы */
+  margin:1rem 8px;
   scrollbar-width:thin; scrollbar-color:#80e4ff #222;
 }
 .rules::-webkit-scrollbar{ width:12px; }
 .rules::-webkit-scrollbar-track{ 
   background:linear-gradient(45deg, #222, #333); 
-  border-radius:10px; margin:4px;
+  border-radius:10px; margin:10px; /* Увеличиваем отступ */
 }
 .rules::-webkit-scrollbar-thumb{ 
   background:linear-gradient(45deg, #80e4ff, #27e881); 
@@ -239,14 +242,23 @@ main{
 }
 
 /* Поиск - обновленный */
-.search{ display:flex; gap:.4rem; align-items:center; flex-wrap:wrap; }
+.search{ 
+  display:flex; align-items:center; justify-content:space-between; 
+  width:100%;
+}
 .search input{
   padding:.5rem .7rem; border:.12vw solid #fff; border-radius:1rem;
-  background:rgba(0,0,0,.55); color:#fff; min-width:200px; font-family:Arial, sans-serif;
+  background:rgba(0,0,0,.55); color:#fff; flex:1; font-family:Arial, sans-serif;
+}
+.search-buttons {
+  display:flex; gap:.4rem;
 }
 
 /* Списки - обновленные */
-.lists{ width:100%; flex:1; overflow:hidden; margin-top:1rem; }
+.lists{ 
+  width:100%; flex:1; overflow:hidden; margin-top:1rem; 
+  height:calc(100% - 100px); /* Фиксированная высота */
+}
 .list{
   list-style:none; margin:0; padding:0;
   border:.12vw solid #fff; border-radius:1rem;
@@ -256,7 +268,7 @@ main{
 .list::-webkit-scrollbar{ width:12px; }
 .list::-webkit-scrollbar-track{ 
   background:linear-gradient(45deg, #222, #333); 
-  border-radius:10px; margin:4px;
+  border-radius:10px; margin:10px; /* Увеличиваем отступ */
 }
 .list::-webkit-scrollbar-thumb{ 
   background:linear-gradient(45deg, #80e4ff, #27e881); 
@@ -282,27 +294,44 @@ main{
 /* Игровое поле - полностью переработанное */
 .gameContent{
   width:100%; height:100%; display:grid; 
-  grid-template-columns: 200px 1fr 200px;
+  grid-template-columns: 120px 1fr 120px; /* Уменьшаем боковые панели */
   grid-template-rows: auto 1fr;
   gap:.8rem; padding:1rem;
 }
 
 .game-hud{ 
   grid-column: 1 / -1;
-  display:flex; gap:.6rem; flex-wrap:wrap; justify-content:center;
+  display:flex; gap:.6rem; justify-content:center;
   margin-bottom:.5rem;
 }
 .tag{ 
-  display:inline-block; padding:.3rem .6rem; border:.12vw solid #fff; 
-  border-radius:.9rem; background:rgba(0,0,0,.45); font-size:.9rem;
+  display:inline-flex; align-items:center; padding:.3rem .6rem; 
+  border:.12vw solid #fff; border-radius:.9rem; 
+  background:rgba(0,0,0,.45); font-size:.9rem;
 }
 
 /* Левая панель - корабли для расстановки */
 .ships-panel{
   display:flex; flex-direction:column; gap:.5rem;
   border:.12vw solid #80e4ff; border-radius:1rem;
-  background:rgba(0,0,0,.3); padding:1rem; overflow-y:auto;
+  background:rgba(0,0,0,.3); padding:1rem; 
+  height:100%; overflow-y:auto;
+  scrollbar-width:thin; scrollbar-color:#80e4ff #222;
 }
+.ships-panel::-webkit-scrollbar{ width:12px; }
+.ships-panel::-webkit-scrollbar-track{ 
+  background:linear-gradient(45deg, #222, #333); 
+  border-radius:10px; margin:10px;
+}
+.ships-panel::-webkit-scrollbar-thumb{ 
+  background:linear-gradient(45deg, #80e4ff, #27e881); 
+  border-radius:10px; border:2px solid #222;
+}
+.ships-panel::-webkit-scrollbar-thumb:hover{ 
+  background:linear-gradient(45deg, #27e881, #80e4ff);
+  box-shadow:0 0 10px rgba(128,228,255,0.5);
+}
+
 .ships-panel h3{ text-align:center; margin-bottom:1rem; color:#80e4ff; }
 .ship-button{
   width:50px; height:50px; border-radius:50%; border:.12vw solid #fff;
@@ -318,8 +347,24 @@ main{
 .weapons-panel{
   display:flex; flex-direction:column; gap:.5rem;
   border:.12vw solid #ff5e2c; border-radius:1rem;
-  background:rgba(0,0,0,.3); padding:1rem; overflow-y:auto;
+  background:rgba(0,0,0,.3); padding:1rem; 
+  height:100%; overflow-y:auto;
+  scrollbar-width:thin; scrollbar-color:#ff5e2c #222;
 }
+.weapons-panel::-webkit-scrollbar{ width:12px; }
+.weapons-panel::-webkit-scrollbar-track{ 
+  background:linear-gradient(45deg, #222, #333); 
+  border-radius:10px; margin:10px;
+}
+.weapons-panel::-webkit-scrollbar-thumb{ 
+  background:linear-gradient(45deg, #ff5e2c, #ff8c00); 
+  border-radius:10px; border:2px solid #222;
+}
+.weapons-panel::-webkit-scrollbar-thumb:hover{ 
+  background:linear-gradient(45deg, #ff8c00, #ff5e2c);
+  box-shadow:0 0 10px rgba(255,94,44,0.5);
+}
+
 .weapons-panel h3{ text-align:center; margin-bottom:1rem; color:#ff5e2c; }
 .weapon-button{
   width:50px; height:50px; border-radius:50%; border:.12vw solid #ff5e2c;
@@ -332,7 +377,7 @@ main{
 
 /* Игровое поле - квадратное без скруглений */
 .board{
-  width:100%; aspect-ratio:1; max-width:70vh; max-height:70vh;
+  width:100%; aspect-ratio:1; max-width:90vh; max-height:90vh; /* Увеличиваем размер */
   display:grid; gap:1px; justify-self:center; align-self:center;
   grid-template-columns:repeat(14,1fr); grid-template-rows:repeat(15,1fr);
   border:.12vw solid #80e4ff; overflow:hidden;
@@ -348,6 +393,8 @@ main{
   -o-transition:background .2s;
   transition:background .2s;
   position:relative;
+  width:100%; /* Фиксированный размер */
+  height:100%; /* Фиксированный размер */
 }
 .board .cell:hover{ background:rgba(8,70,104,.8); }
 .board .cell.selected{ background:rgba(255,255,0,.5); }
@@ -412,8 +459,9 @@ main{
 }
 .modal{ 
   background:rgba(0,0,0,.9); border:.12vw solid #fff; border-radius:1.2rem; 
-  padding:1.5rem; width:min(500px,90%); position:relative; 
-  height:auto; min-height:300px; max-height:85vh;
+  padding:1.5rem; width:min(400px,90%); /* Уменьшаем размер */
+  position:relative; 
+  height:auto; min-height:auto; max-height:85vh;
   display:flex; flex-direction:column;
 }
 
@@ -423,7 +471,8 @@ main{
 
 /* Профиль модалка - фиксированные размеры */
 #profileModal .modal{
-  width:500px; height:600px; max-height:600px;
+  width:400px; /* Уменьшаем размер */
+  height:600px; max-height:600px; /* Фиксированная высота */
 }
 
 .avatarBox{ 
@@ -462,23 +511,22 @@ main{
 
 /* История игр с красивым скроллом */
 .history-container{
-  height:300px; width:100%; 
+  height:400px; width:calc(100% - 16px); /* Отступ от границы */
   border:.12vw solid #fff; border-radius:1rem;
   background:rgba(0,0,0,.5); overflow:hidden; flex:1;
+  margin:0 8px;
 }
 
 .history-list{
   height:100%; overflow-y:auto; list-style:none; margin:0; padding:0;
+  scrollbar-width:thin; scrollbar-color:#80e4ff #222;
 }
 
 /* Кастомный скроллбар для истории */
-.history-list{
-  scrollbar-width:thin; scrollbar-color:#80e4ff #222;
-}
 .history-list::-webkit-scrollbar{ width:12px; }
 .history-list::-webkit-scrollbar-track{ 
   background:linear-gradient(45deg, #222, #333); 
-  border-radius:10px; margin:4px;
+  border-radius:10px; margin:10px; /* Увеличиваем отступ */
 }
 .history-list::-webkit-scrollbar-thumb{ 
   background:linear-gradient(45deg, #80e4ff, #27e881); 
@@ -498,7 +546,7 @@ main{
 
 /* Модалка результата игры */
 .game-result-modal{
-  width:400px; height:300px; text-align:center;
+  width:350px; height:auto; text-align:center;
 }
 .result-title{
   font-size:2rem; margin-bottom:1rem;
@@ -511,6 +559,11 @@ main{
 .rating-change.positive{ color:#27e881; }
 .rating-change.negative{ color:#ff5e2c; }
 
+/* Модалка паузы */
+.pause-modal{
+  width:350px; height:auto; text-align:center;
+}
+
 /* Кастомные уведомления */
 .notification{
   position:fixed; top:2rem; right:2rem; z-index:100;
@@ -519,7 +572,7 @@ main{
   transform:translateX(100%); 
   -webkit-transition:transform .3s ease;
   -moz-transition:transform .3s ease;
-  -ms-transition:transform .3s ease;
+    -ms-transition:transform .3s ease;
   -o-transition:transform .3s ease;
   transition:transform .3s ease;
 }
@@ -536,7 +589,7 @@ main{
   #msWrap{ width:60%; }
   #menuHead{ font-size:9vw; }
   .menuButs{ font-size:2.5vw; }
-  .gameContent{ grid-template-columns: 150px 1fr 150px; }
+  .gameContent{ grid-template-columns: 100px 1fr 100px; }
   .ship-button, .weapon-button{ width:40px; height:40px; font-size:.7rem; }
 }
 
@@ -545,7 +598,7 @@ main{
   #menuHead{ font-size:10vw; }
   .menuButs{ font-size:3vw; width:70%; }
   .search input{ min-width:150px; }
-  .gameContent{ grid-template-columns: 120px 1fr 120px; }
+  .gameContent{ grid-template-columns: 80px 1fr 80px; }
 }
 
 @media (max-width: 600px){
