@@ -471,6 +471,8 @@ class PauseAPI(APIView):
             "duration": pause_duration
         })
 
+# game/api/views.py - исправление в ResignAPI
+
 class ResignAPI(APIView):
     permission_classes = [IsAuthenticated]
     def post(self, request, game_id):
@@ -482,7 +484,10 @@ class ResignAPI(APIView):
         eng = Engine(st.data)
         me = _actor(g, request.user)
         
-        eng.gd.winner = 2 if me == 1 else 1
+        # Определяем победителя
+        winner_player = 3 - me  # Противник
+        
+        eng.gd.winner = winner_player
         eng.gd.win_reason = "resign"
         eng.gd.phase = "FINISHED"
         
@@ -507,13 +512,17 @@ class ResignAPI(APIView):
         winner = g.player2 if me == 1 else g.player1
         loser = request.user
         
-        winner.profile.wins += 1
-        winner.profile.rating_elo += 100
-        winner.profile.save()
+        # Обновляем профили
+        winner_profile = winner.profile
+        loser_profile = loser.profile
         
-        loser.profile.losses += 1
-        loser.profile.rating_elo = max(0, loser.profile.rating_elo - 100)
-        loser.profile.save()
+        winner_profile.wins += 1
+        winner_profile.rating_elo += 100
+        winner_profile.save()
+        
+        loser_profile.losses += 1
+        loser_profile.rating_elo = max(0, loser_profile.rating_elo - 100)
+        loser_profile.save()
         
         return Response({"ok": True, "state": st.data})
 
@@ -695,3 +704,54 @@ class UpdateStats(APIView):
         # Но основное обновление происходит при завершении игры
         return Response({"ok": True})
         
+# Добавить новый API endpoint для отмены паузы
+class CancelPauseAPI(APIView):
+    permission_classes = [IsAuthenticated]
+    def post(self, request, game_id):
+        g = get_object_or_404(Game, id=game_id)
+        if g.player1_id != request.user.id and g.player2_id != request.user.id:
+            return Response({"error": "not your game"}, status=403)
+        
+        me = _actor(g, request.user)
+        
+        # Проверяем, что пауза была инициирована этим игроком
+        if g.status != "PAUSED":
+            return Response({"error": "game not paused"}, status=400)
+        
+        # Возвращаемся к игре
+        g.status = f"TURN_P{g.turn}"
+        g.pause_until = None
+        g.turn_deadline_at = timezone.now() + timezone.timedelta(seconds=30)
+        g.save()
+        
+        # Создаем запись о снятии паузы
+        Move.objects.create(
+            game=g,
+            number=g.moves.count() + 1,
+            actor=me,
+            type="cancel_pause",
+            payload={}
+        )
+        
+        return Response({"ok": True})
+
+# Добавить API для получения убитых фишек
+class KilledPieces(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request, game_id):
+        g = get_object_or_404(Game, id=game_id)
+        if g.player1_id != request.user.id and g.player2_id != request.user.id:
+            return Response({"error": "not your game"}, status=403)
+        
+        me = _actor(g, request.user)
+        opponent = 3 - me
+        
+        # Получаем счетчики убитых фишек противника
+        killed = KilledCounter.objects.filter(game=g, owner=opponent)
+        
+        items = [{
+            "piece": k.piece,
+            "killed": k.killed
+        } for k in killed]
+        
+        return Response({"items": items})

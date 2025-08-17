@@ -171,11 +171,30 @@ main{
 .exit:hover .exit-in:after{ bottom:0; }
 
 /* Профиль справа сверху */
-#topRight{ position:absolute; top:1vw; right:1vw; z-index:10; }
+#topRight{ 
+  position:absolute; 
+  top:1vw; 
+  right:1vw; 
+  z-index:10; 
+  display: flex;
+  gap: 10px;
+}
 .profile-btn{
   display:flex; align-items:center; gap:.6rem; background:transparent;
   border:.12vw solid #fff; border-radius:2rem; padding:.35rem .8rem;
   color:#fff; cursor:pointer; font-family:Arial, sans-serif;
+}
+.logout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: .12vw solid #c23b3b;
+  border-radius: 2rem;
+  padding: .35rem .8rem;
+  color: #ffb3b3;
+  cursor: pointer;
+  font-family: Arial, sans-serif;
 }
 .avatar{ width:30px; height:30px; border-radius:50%; object-fit:cover; border:2px solid #fff; }
 #profileName{ font-weight:normal; }
@@ -213,7 +232,7 @@ main{
   margin:1rem 8px;
   scrollbar-width:thin; scrollbar-color:#80e4ff #222;
 }
-.rules::-webkit-scrollbar{ width:12px; }
+.rules::-webkit-scrollbar{ width:8px; }
 .rules::-webkit-scrollbar-track{ 
   background:linear-gradient(45deg, #222, #333); 
   border-radius:10px; margin:10px; /* Увеличиваем отступ */
@@ -265,353 +284,6 @@ main{
   background:rgba(0,0,0,.5); height:100%; overflow-y:auto;
   scrollbar-width:thin; scrollbar-color:#80e4ff #222;
 }
-.list::-webkit-scrollbar{ width:12px; }
+.list::-webkit-scrollbar{ width:8px; }
 .list::-webkit-scrollbar-track{ 
-  background:linear-gradient(45deg, #222, #333); 
-  border-radius:10px; margin:10px; /* Увеличиваем отступ */
-}
-.list::-webkit-scrollbar-thumb{ 
-  background:linear-gradient(45deg, #80e4ff, #27e881); 
-  border-radius:10px; border:2px solid #222;
-}
-.list::-webkit-scrollbar-thumb:hover{ 
-  background:linear-gradient(45deg, #27e881, #80e4ff);
-  box-shadow:0 0 10px rgba(128,228,255,0.5);
-}
-.list li{
-  display:flex; align-items:center; justify-content:space-between;
-  padding:.8rem; border-bottom:1px solid rgba(255,255,255,.08);
-}
-.list li:last-child{ border-bottom:none; }
-.list li:hover{ background:rgba(255,255,255,.05); }
-.list li.me{ background:rgba(255,255,0,.1); border:1px solid rgba(255,255,0,.3); }
-
-.pane{
-  width:100%; display:none; flex-direction:column;
-}
-.pane.active{ display:flex; }
-
-/* Игровое поле - полностью переработанное */
-.gameContent{
-  width:100%; height:100%; display:grid; 
-  grid-template-columns: 120px 1fr 120px; /* Уменьшаем боковые панели */
-  grid-template-rows: auto 1fr;
-  gap:.8rem; padding:1rem;
-}
-
-.game-hud{ 
-  grid-column: 1 / -1;
-  display:flex; gap:.6rem; justify-content:center;
-  margin-bottom:.5rem;
-}
-.tag{ 
-  display:inline-flex; align-items:center; padding:.3rem .6rem; 
-  border:.12vw solid #fff; border-radius:.9rem; 
-  background:rgba(0,0,0,.45); font-size:.9rem;
-}
-
-/* Левая панель - корабли для расстановки */
-.ships-panel{
-  display:flex; flex-direction:column; gap:.5rem;
-  border:.12vw solid #80e4ff; border-radius:1rem;
-  background:rgba(0,0,0,.3); padding:1rem; 
-  height:100%; overflow-y:auto;
-  scrollbar-width:thin; scrollbar-color:#80e4ff #222;
-}
-.ships-panel::-webkit-scrollbar{ width:12px; }
-.ships-panel::-webkit-scrollbar-track{ 
-  background:linear-gradient(45deg, #222, #333); 
-  border-radius:10px; margin:10px;
-}
-.ships-panel::-webkit-scrollbar-thumb{ 
-  background:linear-gradient(45deg, #80e4ff, #27e881); 
-  border-radius:10px; border:2px solid #222;
-}
-.ships-panel::-webkit-scrollbar-thumb:hover{ 
-  background:linear-gradient(45deg, #27e881, #80e4ff);
-  box-shadow:0 0 10px rgba(128,228,255,0.5);
-}
-
-.ships-panel h3{ text-align:center; margin-bottom:1rem; color:#80e4ff; }
-.ship-button{
-  width:50px; height:50px; border-radius:50%; border:.12vw solid #fff;
-  display:flex; align-items:center; justify-content:center;
-  cursor:pointer; font-weight:bold; font-size:.8rem;
-  transition:all .3s; margin:.2rem auto;
-}
-.ship-button:hover{ transform:scale(1.1); box-shadow:0 0 10px rgba(255,255,255,.5); }
-.ship-button.selected{ border-color:#ffff00; box-shadow:0 0 15px rgba(255,255,0,.7); }
-.ship-count{ font-size:.7rem; margin-top:.2rem; text-align:center; opacity:.8; }
-
-/* Правая панель - оружие */
-.weapons-panel{
-  display:flex; flex-direction:column; gap:.5rem;
-  border:.12vw solid #ff5e2c; border-radius:1rem;
-  background:rgba(0,0,0,.3); padding:1rem; 
-  height:100%; overflow-y:auto;
-  scrollbar-width:thin; scrollbar-color:#ff5e2c #222;
-}
-.weapons-panel::-webkit-scrollbar{ width:12px; }
-.weapons-panel::-webkit-scrollbar-track{ 
-  background:linear-gradient(45deg, #222, #333); 
-  border-radius:10px; margin:10px;
-}
-.weapons-panel::-webkit-scrollbar-thumb{ 
-  background:linear-gradient(45deg, #ff5e2c, #ff8c00); 
-  border-radius:10px; border:2px solid #222;
-}
-.weapons-panel::-webkit-scrollbar-thumb:hover{ 
-  background:linear-gradient(45deg, #ff8c00, #ff5e2c);
-  box-shadow:0 0 10px rgba(255,94,44,0.5);
-}
-
-.weapons-panel h3{ text-align:center; margin-bottom:1rem; color:#ff5e2c; }
-.weapon-button{
-  width:50px; height:50px; border-radius:50%; border:.12vw solid #ff5e2c;
-  display:flex; align-items:center; justify-content:center;
-  cursor:pointer; font-weight:bold; font-size:.8rem;
-  transition:all .3s; margin:.2rem auto; background:rgba(255,94,44,.2);
-}
-.weapon-button:hover{ transform:scale(1.1); box-shadow:0 0 10px rgba(255,94,44,.5); }
-.weapon-button.selected{ border-color:#ffff00; box-shadow:0 0 15px rgba(255,255,0,.7); }
-
-/* Игровое поле - квадратное без скруглений */
-.board{
-  width:100%; aspect-ratio:1; max-width:90vh; max-height:90vh; /* Увеличиваем размер */
-  display:grid; gap:1px; justify-self:center; align-self:center;
-  grid-template-columns:repeat(14,1fr); grid-template-rows:repeat(15,1fr);
-  border:.12vw solid #80e4ff; overflow:hidden;
-  background: linear-gradient(315deg,#4dff03,#00d0ff);
-  position:relative;
-}
-.board .cell{
-  background:rgba(8,70,104,.66); display:flex; align-items:center; justify-content:center;
-  cursor:pointer; 
-  -webkit-transition:background .2s;
-  -moz-transition:background .2s;
-  -ms-transition:background .2s;
-  -o-transition:background .2s;
-  transition:background .2s;
-  position:relative;
-  width:100%; /* Фиксированный размер */
-  height:100%; /* Фиксированный размер */
-}
-.board .cell:hover{ background:rgba(8,70,104,.8); }
-.board .cell.selected{ background:rgba(255,255,0,.5); }
-.board .cell.valid-move{ background:rgba(0,255,0,.3); }
-.board .cell.attack-zone{ background:rgba(255,0,0,.3); }
-.board .cell.my-zone{ background:rgba(0,100,255,.2); }
-.board .cell.enemy-zone{ background:rgba(255,100,0,.2); }
-
-.board .piece{
-  width:100%; height:100%; display:flex; align-items:center; justify-content:center;
-  font-weight:800; letter-spacing:.5px; font-size:clamp(6px,1vw,12px);
-  position:relative;
-}
-.board .piece.destroyed::after{
-  content:'✕'; position:absolute; top:0; left:0; right:0; bottom:0;
-  display:flex; align-items:center; justify-content:center;
-  color:#ff0000; font-size:1.5em; font-weight:bold;
-  background:rgba(255,0,0,.2);
-}
-
-/* Анимации для атак */
-.attack-arrow{
-  position:absolute; z-index:10; pointer-events:none;
-  width:30px; height:30px; background:rgba(255,0,0,.8);
-  border-radius:50%; display:flex; align-items:center; justify-content:center;
-  color:#fff; font-weight:bold; animation:pulse 1s infinite;
-}
-@keyframes pulse{
-  0%{ transform:scale(1); opacity:1; }
-  50%{ transform:scale(1.2); opacity:0.7; }
-  100%{ transform:scale(1); opacity:1; }
-}
-
-.explosion{
-  position:absolute; z-index:15; pointer-events:none;
-  width:60px; height:60px; background:radial-gradient(circle, #ff4500, #ff0000);
-  border-radius:50%; animation:explode 0.8s ease-out forwards;
-}
-@keyframes explode{
-  0%{ transform:scale(0); opacity:1; }
-  50%{ transform:scale(1.5); opacity:0.8; }
-  100%{ transform:scale(2); opacity:0; }
-}
-
-/* Зоны красных линий */
-.board .cell:nth-child(n+71):nth-child(-n+84){ border-top:3px solid #ff0000; }
-.board .cell:nth-child(n+141):nth-child(-n+154){ border-top:3px solid #ff0000; }
-
-/* Цвета фигур */
-.kindБДК,.kindА,.kindАБ{background:#b93b2e; color:#fff;}
-.kindТК,.kindТ,.kindТР{background:#1f8f55; color:#fff;}
-.kindКР,.kindЛ,.kindФ,.kindЭС,.kindСТ{background:#1c6fb1; color:#fff;}
-.kindПЛ,.kindКРПЛ{background:#0b4f6c; color:#fff;}
-.kindМ,.kindСМ{background:#6e7b85; color:#fff;}
-.kindТН{background:#d35400; color:#fff;}
-.kindВМБ{background:#95a5a6; color:#000;}
-
-/* Модалки - компактные */
-.modal-backdrop{ 
-  position:fixed; inset:0; background:#0009; display:none; 
-  align-items:center; justify-content:center; z-index:50;
-}
-.modal{ 
-  background:rgba(0,0,0,.9); border:.12vw solid #fff; border-radius:1.2rem; 
-  padding:1.5rem; width:min(400px,90%); /* Уменьшаем размер */
-  position:relative; 
-  height:auto; min-height:auto; max-height:85vh;
-  display:flex; flex-direction:column;
-}
-
-.modalTitle{ 
-  text-align:center; margin:0 0 1rem 0; font-size:1.3rem; color:#80e4ff;
-}
-
-/* Профиль модалка - фиксированные размеры */
-#profileModal .modal{
-  width:400px; /* Уменьшаем размер */
-  height:600px; max-height:600px; /* Фиксированная высота */
-}
-
-.avatarBox{ 
-  display:flex; flex-direction:column; gap:.8rem; align-items:center; 
-  justify-content:center; margin-bottom:1rem;
-}
-.avatarLarge{ 
-  width:80px; height:80px; border-radius:50%; object-fit:cover; 
-  border:2px solid #fff;
-}
-
-.modal .tabbar{
-  justify-content:center; margin:.8rem 0;
-}
-
-.modal .pane{
-  width:100%; display:none; flex-direction:column; flex:1;
-}
-.modal .pane.active{ display:flex; }
-
-.form-row{ 
-  display:flex; flex-direction:column; gap:.3rem; margin:.5rem 0; text-align:left;
-}
-.form-row label{ font-weight:bold; color:#80e4ff; font-size:.9rem; }
-.form-row input{
-  padding:.5rem; border:.12vw solid #fff; border-radius:.6rem;
-  background:rgba(0,0,0,.55); color:#fff; font-family:Arial, sans-serif;
-  font-size:.9rem;
-}
-.form-row.right{ align-items:flex-end; }
-
-.btnRow{ 
-  display:flex; gap:.8rem; align-items:center; justify-content:center; 
-  margin-top:1rem; flex-wrap:wrap;
-}
-
-/* История игр с красивым скроллом */
-.history-container{
-  height:400px; width:calc(100% - 16px); /* Отступ от границы */
-  border:.12vw solid #fff; border-radius:1rem;
-  background:rgba(0,0,0,.5); overflow:hidden; flex:1;
-  margin:0 8px;
-}
-
-.history-list{
-  height:100%; overflow-y:auto; list-style:none; margin:0; padding:0;
-  scrollbar-width:thin; scrollbar-color:#80e4ff #222;
-}
-
-/* Кастомный скроллбар для истории */
-.history-list::-webkit-scrollbar{ width:12px; }
-.history-list::-webkit-scrollbar-track{ 
-  background:linear-gradient(45deg, #222, #333); 
-  border-radius:10px; margin:10px; /* Увеличиваем отступ */
-}
-.history-list::-webkit-scrollbar-thumb{ 
-  background:linear-gradient(45deg, #80e4ff, #27e881); 
-  border-radius:10px; border:2px solid #222;
-}
-.history-list::-webkit-scrollbar-thumb:hover{ 
-  background:linear-gradient(45deg, #27e881, #80e4ff);
-  box-shadow:0 0 10px rgba(128,228,255,0.5);
-}
-
-.history-list li{
-  display:flex; align-items:center; justify-content:space-between;
-  padding:.8rem; border-bottom:1px solid rgba(255,255,255,.08);
-}
-.history-list li:last-child{ border-bottom:none; }
-.history-list li:hover{ background:rgba(255,255,255,.05); }
-
-/* Модалка результата игры */
-.game-result-modal{
-  width:350px; height:auto; text-align:center;
-}
-.result-title{
-  font-size:2rem; margin-bottom:1rem;
-}
-.result-title.victory{ color:#27e881; }
-.result-title.defeat{ color:#ff5e2c; }
-.rating-change{
-  font-size:1.2rem; margin:1rem 0;
-}
-.rating-change.positive{ color:#27e881; }
-.rating-change.negative{ color:#ff5e2c; }
-
-/* Модалка паузы */
-.pause-modal{
-  width:350px; height:auto; text-align:center;
-}
-
-/* Кастомные уведомления */
-.notification{
-  position:fixed; top:2rem; right:2rem; z-index:100;
-  background:rgba(0,0,0,.9); border:.12vw solid #80e4ff; border-radius:1rem;
-  padding:1rem 1.5rem; color:#fff; min-width:300px; max-width:400px;
-  transform:translateX(100%); 
-  -webkit-transition:transform .3s ease;
-  -moz-transition:transform .3s ease;
-    -ms-transition:transform .3s ease;
-  -o-transition:transform .3s ease;
-  transition:transform .3s ease;
-}
-.notification.show{ transform:translateX(0); }
-.notification.success{ border-color:#27e881; }
-.notification.error{ border-color:#ff5e2c; }
-.notification.warning{ border-color:#ffbc00; }
-
-.notification-title{ font-weight:bold; margin-bottom:.5rem; }
-.notification-message{ font-size:.9rem; opacity:.9; }
-
-/* Адаптив */
-@media (max-width: 1200px){
-  #msWrap{ width:60%; }
-  #menuHead{ font-size:9vw; }
-  .menuButs{ font-size:2.5vw; }
-  .gameContent{ grid-template-columns: 100px 1fr 100px; }
-  .ship-button, .weapon-button{ width:40px; height:40px; font-size:.7rem; }
-}
-
-@media (max-width: 900px){
-  #msWrap{ width:80%; }
-  #menuHead{ font-size:10vw; }
-  .menuButs{ font-size:3vw; width:70%; }
-  .search input{ min-width:150px; }
-  .gameContent{ grid-template-columns: 80px 1fr 80px; }
-}
-
-@media (max-width: 600px){
-  #msWrap{ width:95%; height:95%; }
-  #menuHead{ font-size:12vw; }
-  .menuButs{ font-size:4vw; width:80%; }
-  .modal{ width:95%; padding:1rem; }
-  .gameContent{ grid-template-columns: 1fr; grid-template-rows: auto auto 1fr auto; }
-  .ships-panel, .weapons-panel{ flex-direction:row; height:auto; }
-}
-
-/* Утилиты */
-.hide{opacity:0; visibility:hidden;}
-.muted{opacity:.7;}
-.text-center{text-align:center;}
-.text-left{text-align:left;}
+  

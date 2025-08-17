@@ -21,10 +21,10 @@ class Game(models.Model):
     
     # Паузы
     pause_until = models.DateTimeField(null=True, blank=True)
-    short_pause_p1 = models.BooleanField(default=False)
-    long_pause_p1 = models.BooleanField(default=False)
-    short_pause_p2 = models.BooleanField(default=False)
-    long_pause_p2 = models.BooleanField(default=False)
+    short_pause_p1 = models.BooleanField(default=False)  # Короткая пауза игрока 1
+    long_pause_p1 = models.BooleanField(default=False)   # Длинная пауза игрока 1
+    short_pause_p2 = models.BooleanField(default=False)  # Короткая пауза игрока 2
+    long_pause_p2 = models.BooleanField(default=False)   # Длинная пауза игрока 2
 
     ready_p1 = models.BooleanField(default=False)
     ready_p2 = models.BooleanField(default=False)

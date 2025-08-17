@@ -11,7 +11,7 @@
       data-login="{% if request.user.is_authenticated %}{{ request.user.profile.login }}{% endif %}"
       data-avatar="{% if request.user.is_authenticated %}{{ request.user.profile.get_avatar_url }}{% else %}{% static 'img/avatar_stub.png' %}{% endif %}">
 
-  <main class="flex-center">
+    <main class="flex-center">
     <!-- Контейнер как в игре-примере -->
     <div id="msWrap" class="front-back front flex-center">
       <div id="msContainer" class="flex-center">
@@ -126,7 +126,7 @@
                     </div>
                   </div>
 
-                  <!-- Левая панель - корабли -->
+                  <!-- Левая панель - список фишек -->
                   <div class="ships-panel">
                     <h3>Флот</h3>
                     <div id="shipsContainer">
@@ -135,23 +135,17 @@
                   </div>
 
                   <!-- Игровое поле -->
-                  <div id="board" class="board">
-                    <!-- Клетки будут добавлены через JS -->
+                  <div class="board-container">
+                    <div id="board" class="board">
+                      <!-- Клетки будут добавлены через JS -->
+                    </div>
                   </div>
 
-                  <!-- Правая панель - оружие -->
-                  <div class="weapons-panel">
-                    <h3>Оружие</h3>
-                    <div id="weaponsContainer">
-                      <div class="weapon-button" data-weapon="torpedo">
-                        <span>Т</span>
-                      </div>
-                      <div class="weapon-button" data-weapon="air">
-                        <span>С</span>
-                      </div>
-                      <div class="weapon-button" data-weapon="bomb">
-                        <span>АБ</span>
-                      </div>
+                  <!-- Правая панель - управление -->
+                  <div class="controls-panel">
+                    <h3>Управление</h3>
+                    <div id="controlsContainer">
+                      <!-- Кнопки управления будут добавлены через JS -->
                     </div>
                   </div>
                 </div>
@@ -260,7 +254,7 @@
             <label>Пароль</label>
             <input name="password" type="password" required>
           </div>
-                    <div class="btnRow">
+          <div class="btnRow">
             <button class="menuButs xs" type="submit">Зарегистрироваться</button>
           </div>
         </form>
@@ -306,25 +300,36 @@
   </div>
 
   <!-- Модалка паузы -->
-    <div id="pauseModal" class="modal-backdrop">
+  <div id="pauseModal" class="modal-backdrop">
     <div class="modal pause-modal">
-        <h3 class="modalTitle">Пауза</h3>
-        <div class="pause-info">
+      <h3 class="modalTitle">Пауза</h3>
+      <div class="pause-info">
         Доступные паузы:
         <div>Короткая (1 мин): Доступна</div>
         <div>Длинная (3 мин): Доступна</div>
-        </div>
-        <div class="btnRow">
+      </div>
+      <div class="btnRow">
         <button id="shortPauseBtn" class="menuButs xs">Короткая (1 мин)</button>
         <button id="longPauseBtn" class="menuButs xs">Длинная (3 мин)</button>
-        </div>
-        <div class="btnRow">
+      </div>
+      <div class="btnRow">
         <button id="cancelPauseBtn" class="menuButs xs danger">Отмена</button>
-        </div>
+      </div>
     </div>
+  </div>
+
+  <!-- Оверлей паузы -->
+  <div id="pauseModalOverlay" class="pause-modal-overlay" style="display: none;">
+    <div class="pause-modal-content">
+      <h2>ПАУЗА</h2>
+            <div id="pauseTimer" class="pause-timer">0:00</div>
+      <div id="pauseInfo" class="pause-info">Игра приостановлена</div>
+      <div id="pauseControls" style="display: none;">
+        <button id="cancelPauseBtn2" class="menuButs xs">Снять паузу</button>
+      </div>
     </div>
+  </div>
 
   <script src="{% static 'js/app.js' %}"></script>
 </body>
 </html>
-            
