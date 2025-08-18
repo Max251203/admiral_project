@@ -215,15 +215,16 @@ main{
 .rules p{ margin-bottom:0.8rem; line-height:1.4; }
 
 /* Лобби */
-.lobbyContent{ 
-  width:100%; 
-  height:100%; 
-  display:flex; 
-  flex-direction:column; 
-  gap:1rem; 
-  align-items:center; 
-  padding-top:1rem; 
+.lobbyContent { 
+  width: 100%; 
+  height: calc(100% - 60px); /* Вычитаем высоту табов */
+  display: flex; 
+  flex-direction: column; 
+  align-items: center; 
+  padding: 0 1rem; 
+  box-sizing: border-box;
 }
+
 .settBox{ 
   display:flex; 
   align-items:center; 
@@ -234,6 +235,7 @@ main{
   border-radius:1.5rem; 
   background:rgba(0,0,0,.3); 
   gap:1rem; 
+  margin-top: 1rem;
 }
 
 /* Поиск */
@@ -258,36 +260,30 @@ main{
 }
 
 /* Списки */
-.lists{ 
-  width:100%; 
-  flex:1; 
-  overflow:hidden; 
-  margin-top:1rem; 
-  height:calc(100% - 100px); 
+.lists { 
+  width: 100%; 
+  height: calc(100% - 80px); /* Вычитаем высоту settBox и отступы */
+  margin-top: 1rem; 
 }
 
-/* Скроллируемый контейнер для списков */
 .scrollable-container {
-  position: relative;
+  width: 100%;
   height: 100%;
+  border: .12vw solid #fff; 
+  border-radius: 1rem;
+  background: rgba(0,0,0,.5);
   overflow: hidden;
-  border:.12vw solid #fff; 
-  border-radius:1rem;
-  background:rgba(0,0,0,.5);
 }
 
-.list{
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 8px; /* отступ для скролла */
-  bottom: 0;
-  list-style:none; 
-  margin:0; 
-  padding:0;
-  overflow-y:auto;
-  scrollbar-width:thin;
-  scrollbar-color:#80e4ff #222;
+.list {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  scrollbar-width: thin;
+  scrollbar-color: #80e4ff #222;
 }
 .list::-webkit-scrollbar{ width:8px; }
 .list::-webkit-scrollbar-track{ background:linear-gradient(45deg, #222, #333); border-radius:10px; margin:6px 0; }
@@ -304,7 +300,7 @@ main{
   height:100%; 
   display:grid; 
   grid-template-columns: 150px 1fr 150px; 
-  grid-template-rows: auto 1fr; 
+  grid-template-rows: auto 1fr auto; 
   gap:5px; 
   padding:5px; 
 }
@@ -325,6 +321,35 @@ main{
   font-size:.9rem; 
 }
 
+/* Боковые панели */
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  border: .12vw solid #80e4ff;
+  border-radius: 1rem;
+  background: rgba(0,0,0,.3);
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.side-panel-inner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 8px;
+  bottom: 0;
+  overflow-y: auto;
+  padding: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: #80e4ff #222;
+}
+
+.side-panel-inner::-webkit-scrollbar { width: 8px; }
+.side-panel-inner::-webkit-scrollbar-track { background: linear-gradient(45deg, #222, #333); border-radius: 10px; margin: 6px 0; }
+.side-panel-inner::-webkit-scrollbar-thumb { background: linear-gradient(45deg, #80e4ff, #27e881); border-radius: 10px; border: 2px solid #222; }
+.side-panel-inner::-webkit-scrollbar-thumb:hover { background: linear-gradient(45deg, #27e881, #80e4ff); box-shadow: 0 0 10px rgba(128,228,255,0.5); }
+
 /* Левая панель — флот */
 .ships-panel{
   display:flex; 
@@ -336,15 +361,10 @@ main{
   overflow:hidden;
   position: relative;
 }
-.ships-panel h3{ 
-  text-align:center; 
-  margin:10px 0; 
-  color:#80e4ff; 
-  padding:0 10px;
-}
+
 .ships-panel-inner {
   position: absolute;
-  top: 40px;
+  top: 0;
   left: 0;
   right: 8px; /* отступ для скролла */
   bottom: 0;
@@ -381,22 +401,13 @@ main{
   overflow:hidden;
   position: relative;
 }
-.controls-panel h3{ 
-  text-align:center; 
-  margin:10px 0; 
-  color:#ff5e2c; 
-  padding:0 10px;
-  font-size:.9rem; 
-  white-space:nowrap; 
-  overflow:hidden; 
-  text-overflow:ellipsis; 
-}
+
 .controls-panel-inner {
   position: absolute;
-  top: 40px;
+  top: 0;
   left: 0;
   right: 8px; /* отступ для скролла */
-  bottom: 60%; /* Верхние 60% для управления */
+  bottom: 0;
   overflow-y: auto;
   padding: 10px;
   scrollbar-width: thin;
@@ -407,22 +418,15 @@ main{
 .controls-panel-inner::-webkit-scrollbar-thumb{ background:linear-gradient(45deg, #80e4ff, #27e881); border-radius:10px; border:2px solid #222; }
 .controls-panel-inner::-webkit-scrollbar-thumb:hover{ background:linear-gradient(45deg, #27e881, #80e4ff); box-shadow:0 0 10px rgba(128,228,255,0.5); }
 
-/* Нижняя часть правой панели - убитые фишки */
+/* Нижняя часть - убитые фишки */
 .killed-section {
-  position: absolute;
-  top: 40%;
-  left: 0;
-  right: 8px;
-  bottom: 0;
-  overflow-y: auto;
+  grid-column: 1 / -1;
+  border: .12vw solid #80e4ff;
+  border-radius: 1rem;
+  background: rgba(0,0,0,.3);
   padding: 10px;
-  scrollbar-width: thin;
-  scrollbar-color: #80e4ff #222;
+  overflow: hidden;
 }
-.killed-section::-webkit-scrollbar{ width:8px; }
-.killed-section::-webkit-scrollbar-track{ background:linear-gradient(45deg, #222, #333); border-radius:10px; margin:6px 0; }
-.killed-section::-webkit-scrollbar-thumb{ background:linear-gradient(45deg, #80e4ff, #27e881); border-radius:10px; border:2px solid #222; }
-.killed-section::-webkit-scrollbar-thumb:hover{ background:linear-gradient(45deg, #27e881, #80e4ff); box-shadow:0 0 10px rgba(128,228,255,0.5); }
 
 .control-item { 
   padding:.7rem .5rem; 
@@ -469,18 +473,13 @@ main{
 }
 .board{
   width:100%; 
-  height:0; 
-  padding-bottom:100%;
+  height:100%; 
   display:grid; 
   grid-template-columns:repeat(14, 1fr); 
   grid-template-rows:repeat(15, 1fr);
   gap:1px; 
   border:.12vw solid #80e4ff; 
   background: linear-gradient(315deg,#4dff03,#00d0ff);
-  position:relative; 
-  max-width:min(100%, calc(100vh - 100px)); 
-  max-height:min(100%, calc(100vh - 100px));
-  aspect-ratio: 14/15;
 }
 .board .cell{
   width:100%; 
@@ -492,6 +491,7 @@ main{
   cursor:pointer; 
   transition:background .2s; 
   position:relative;
+  aspect-ratio: 1/1;
 }
 .board .cell:hover{ background:rgba(8,70,104,.8); }
 .board .cell.selected{ background:rgba(255,255,0,.5); }
@@ -536,8 +536,8 @@ main{
 .group-indicator { position:absolute; top:0; right:0; width:12px; height:12px; background:#ffff00; border-radius:50%; z-index:5; }
 
 /* Красные линии-зоны */
-.board .cell:nth-child(n+71):nth-child(-n+84){ border-top:3px solid #ff0000; }
-.board .cell:nth-child(n+141):nth-child(-n+154){ border-top:3px solid #ff0000; }
+.board .cell[data-y="5"] { border-top:3px solid #ff0000; }
+.board .cell[data-y="10"] { border-top:3px solid #ff0000; }
 
 /* Цвета фигур */
 .kindБДК,.kindА,.kindАБ{background:#b93b2e; color:#fff;}

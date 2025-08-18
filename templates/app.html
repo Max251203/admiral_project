@@ -106,35 +106,30 @@
               <div id="gameContent" class="content-pane" style="display:none;">
                 <div class="gameContent">
                   <div class="game-hud">
-                    <div class="tag"><span id="turnIndicator">Ваш ход</span></div>
-                    <div class="tag">Таймер: <span id="hudTimer">30s</span></div>
-                    <div class="tag">Банк: <span id="hudBank">15:00</span></div>
+                    <div class="tag">Расстановка фишек</div>
+                    <div class="tag">Таймер: <span id="hudTimer">15:00</span></div>
                     <div class="tag">
-                      <button id="pauseBtn" class="menuButs xs">Пауза</button>
-                      <button id="resignBtn" class="menuButs xs danger">Сдаться</button>
+                      <button id="autoPlaceBtn" class="menuButs xs">Авторасстановка</button>
                     </div>
                   </div>
 
-                  <div class="ships-panel">
-                    <h3>Флот</h3>
-                    <div id="shipsContainer"></div>
+                  <div class="side-panel" id="leftPanel">
+                    <div class="side-panel-inner" id="leftPanelInner"></div>
                   </div>
 
                   <div class="board-container">
                     <div id="board" class="board"></div>
                   </div>
 
-                  <div class="controls-panel">
-                    <h3>Управление</h3>
-                    <div id="controlsContainer"></div>
-                    
-                    <div class="killed-section">
-                      <h3>Убитые фишки</h3>
-                      <table class="killed-table">
-                        <thead><tr><th>Тип</th><th>Убито</th><th>Всего</th></tr></thead>
-                        <tbody id="killedTableBody"></tbody>
-                      </table>
-                    </div>
+                  <div class="side-panel" id="rightPanel">
+                    <div class="side-panel-inner" id="rightPanelInner"></div>
+                  </div>
+
+                  <div class="killed-section">
+                    <table class="killed-table">
+                      <thead><tr><th>Тип</th><th>Убито</th><th>Всего</th></tr></thead>
+                      <tbody id="killedTableBody"></tbody>
+                    </table>
                   </div>
                 </div>
               </div>
@@ -157,7 +152,7 @@
       <div class="avatarBox">
         <img id="pAvatarPreview" class="avatarLarge" src="{% static 'img/avatar_stub.png' %}" alt="avatar">
         <label for="pAvatar" class="menuButs xs">Сменить аватар</label>
-                <input id="pAvatar" type="file" accept="image/*" style="display:none;">
+        <input id="pAvatar" type="file" accept="image/*" style="display:none;">
       </div>
       <div class="tabbar">
         <button class="tab active" data-pane="p-info">Данные</button>
@@ -230,8 +225,7 @@
   <div id="waitOpponentModal" class="modal-backdrop">
     <div class="modal">
       <h3 class="modalTitle">Ожидание соперника</h3>
-      <p class="text-center">Пожалуйста, подождите пока соперник завершит расстановку фишек.</p>
-      <div id="setupTimerDisplay" class="pause-timer">15:00</div>
+      <p class="text-center">Вы успешно расставили фишки и ожидаете, пока соперник завершит расстановку.</p>
     </div>
   </div>
 
