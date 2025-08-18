@@ -101,7 +101,6 @@ const gameContent = document.getElementById('gameContent');
 
 const quickBtn = document.getElementById('quickBtn');
 const showMeBtn = document.getElementById('showMeBtn');
-
 const userSearch = document.getElementById('userSearch');
 const friendSearch = document.getElementById('friendSearch');
 const usersList = document.getElementById('usersList');
@@ -163,10 +162,13 @@ function showContent(contentType){
   if(contentType === 'rules'){ rulesContent.style.display = 'block'; }
   else if(contentType === 'lobby'){ lobbyContent.style.display = 'block'; }
   else if(contentType === 'game'){ gameContent.style.display = 'block'; }
+  
+  // Всегда переворачиваем карточку вправо при переходе на новую карточку
   msContainer.classList.add('flip');
 }
 
 function showMenu(){
+  // Всегда переворачиваем карточку влево при возврате в меню
   msContainer.classList.remove('flip');
   if(App.game.pollTimer){ clearInterval(App.game.pollTimer); App.game.pollTimer = null; }
   if(App.game.setupTimer){ clearInterval(App.game.setupTimer); App.game.setupTimer = null; }
@@ -253,8 +255,7 @@ settExit.addEventListener('click', () => {
       } catch (e) {
         // Игнорируем ошибки при выходе
       }
-      showContent('lobby');
-      setTimeout(() => { loadUsers(''); loadFriends(); }, 100);
+      showMenu(); // Возвращаемся в меню
       document.body.removeChild(confirmModal);
     });
     
@@ -262,10 +263,9 @@ settExit.addEventListener('click', () => {
       confirmModal.style.display = 'none';
       document.body.removeChild(confirmModal);
     });
-  } else {
-    // Если не в игре - просто возвращаемся в лобби
-    showContent('lobby');
-    setTimeout(() => { loadUsers(''); loadFriends(); }, 100);
+  } else if (lobbyContent.style.display === 'block' || rulesContent.style.display === 'block') {
+    // Если в лобби или правилах - возвращаемся в меню
+    showMenu();
   }
 });
 
@@ -406,7 +406,7 @@ function renderUsersList(arr){
 if(userSearch) userSearch.addEventListener('input', () => loadUsers(userSearch.value.trim()));
 if(friendSearch) friendSearch.addEventListener('input', () => filterFriends(friendSearch.value.trim()));
 if(showMeBtn) showMeBtn.addEventListener('click', () => {
-  if(!App.isAuth) return;
+    if(!App.isAuth) return;
   const myItem = usersList.querySelector(`[data-login="${App.meLogin}"]`);
   if(myItem) {
     myItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -480,7 +480,7 @@ async function loadFriends(){
         loadFriends(); 
         showNotification('Успех', 'Друг удален', 'success'); 
       }
-            catch(e){ showNotification('Ошибка', 'Не удалось удалить друга', 'error'); }
+      catch(e){ showNotification('Ошибка', 'Не удалось удалить друга', 'error'); }
     }));
   }catch(err){ friendsList.innerHTML='<li>Ошибка загрузки</li>'; }
 }
@@ -584,7 +584,7 @@ function createGameUI() {
         <div class="tag">Расстановка фишек</div>
         <div class="tag">Таймер: <span id="hudTimer">15:00</span></div>
         <div class="tag">
-          <button id="autoPlaceBtn" class="menuButs xs">Авторасстановка</button>
+          <button id="autoPlaceBtn" class="menuButs xs">Авто</button>
         </div>
       </div>
       <div class="side-panel" id="leftPanel">
@@ -597,10 +597,12 @@ function createGameUI() {
         <div class="side-panel-inner" id="rightPanelInner"></div>
       </div>
       <div class="killed-section">
-        <table class="killed-table">
-          <thead><tr><th>Тип</th><th>Убито</th><th>Всего</th></tr></thead>
-          <tbody id="killedTableBody"></tbody>
-        </table>
+        <div class="killed-table-container">
+          <table class="killed-table">
+            <thead><tr><th>Тип</th><th>Убито</th><th>Всего</th></tr></thead>
+            <tbody id="killedTableBody"></tbody>
+          </table>
+        </div>
       </div>
     `;
   } else {
@@ -625,10 +627,12 @@ function createGameUI() {
         <div class="side-panel-inner" id="rightPanelInner"></div>
       </div>
       <div class="killed-section">
-        <table class="killed-table">
-          <thead><tr><th>Тип</th><th>Убито</th><th>Всего</th></tr></thead>
-          <tbody id="killedTableBody"></tbody>
-        </table>
+        <div class="killed-table-container">
+          <table class="killed-table">
+            <thead><tr><th>Тип</th><th>Убито</th><th>Всего</th></tr></thead>
+            <tbody id="killedTableBody"></tbody>
+          </table>
+        </div>
       </div>
     `;
   }
@@ -713,7 +717,7 @@ function createGameUI() {
     airstrikeBtn.className = 'control-button';
     airstrikeBtn.id = 'airstrikeBtn';
     airstrikeBtn.textContent = 'Воздушная атака';
-    airstrikeBtn.addEventListener('click', () => startSpecialAttack('airstrike'));
+        airstrikeBtn.addEventListener('click', () => startSpecialAttack('airstrike'));
     rightPanelInner.appendChild(airstrikeBtn);
     
     const bombBtn = document.createElement('div');
@@ -789,6 +793,12 @@ async function resignGame() {
 }
 
 function startSpecialAttack(type) {
+  // Проверяем, чей сейчас ход
+  if(App.game.state && App.game.state.turn !== App.game.myPlayer) {
+    showNotification('Ошибка', 'Сейчас не ваш ход', 'error');
+    return;
+  }
+  
   // Сбрасываем все режимы
   App.game.groupMode = false;
   App.game.attackMode = false;
@@ -821,6 +831,12 @@ function startSpecialAttack(type) {
 }
 
 function toggleGroupMode() {
+  // Проверяем, чей сейчас ход
+  if(App.game.state && App.game.state.turn !== App.game.myPlayer) {
+    showNotification('Ошибка', 'Сейчас не ваш ход', 'error');
+    return;
+  }
+  
   const groupBtn = document.getElementById('groupBtn');
   if(App.game.groupMode){
     App.game.groupMode = false; 
@@ -842,6 +858,12 @@ function toggleGroupMode() {
 }
 
 function toggleAttackMode() {
+  // Проверяем, чей сейчас ход
+  if(App.game.state && App.game.state.turn !== App.game.myPlayer) {
+    showNotification('Ошибка', 'Сейчас не ваш ход', 'error');
+    return;
+  }
+  
   const attackBtn = document.getElementById('attackBtn');
   if(App.game.attackMode){
     App.game.attackMode = false; 
@@ -907,6 +929,7 @@ function clearBoard(){
       cell.dataset.y = r;
       
       // Определяем зоны для игрока
+      // Для каждого игрока его зона всегда внизу, а зона противника вверху
       if(App.game.myPlayer === 1) { 
         if(r >= 10) cell.classList.add('my-zone'); 
         else if(r < 5) cell.classList.add('enemy-zone'); 
@@ -1048,7 +1071,7 @@ function showTorpedoDirections(tx, ty) {
     if(dir[0] === backDirection[0] && dir[1] === backDirection[1]) return;
     
     const nx = tx + dir[0], ny = ty + dir[1];
-    if(nx >= 0 && nx < 14 && ny >= 0 && ny < 15) {
+        if(nx >= 0 && nx < 14 && ny >= 0 && ny < 15) {
       highlightCell(nx, ny, 'valid-move');
     }
   });
@@ -1149,7 +1172,7 @@ async function executeAirstrikeAttack() {
       document.querySelectorAll('.control-button').forEach(btn => btn.classList.remove('selected'));
       
       updateKilledTable();
-        }
+    }
   } catch(err) {
     showNotification('Ошибка', 'Не удалось выполнить воздушную атаку: ' + err.message, 'error');
     airstrikeState = { a: null, s: null };
@@ -1383,7 +1406,7 @@ async function moveAndAttack(fx, fy, tx, ty){
       clone.style.width = srcRect.width + 'px';
       clone.style.height = srcRect.height + 'px';
       
-      // Вычисляем смещение для анимации
+            // Вычисляем смещение для анимации
       const moveX = dstRect.left - srcRect.left;
       const moveY = dstRect.top - srcRect.top;
       
@@ -1468,7 +1491,7 @@ async function movePiece(fx, fy, tx, ty){
       const clone = piece.cloneNode(true);
       document.body.appendChild(clone);
       
-            // Позиционируем клон над исходной фишкой
+      // Позиционируем клон над исходной фишкой
       const srcRect = srcCell.getBoundingClientRect();
       const dstRect = dstCell.getBoundingClientRect();
       
@@ -1644,9 +1667,10 @@ function showValidMoves(x, y, kind){
 
 // Размещение
 async function placeShip(x, y, shipType){
+  // Определяем зону расстановки для текущего игрока
   let validZone = false;
-  if(App.game.myPlayer===1 && y>=10) validZone = true;
-  else if(App.game.myPlayer===2 && y<5) validZone = true;
+  if(App.game.myPlayer === 1 && y >= 10) validZone = true;
+  else if(App.game.myPlayer === 2 && y < 5) validZone = true;
   
   if(!validZone){ 
     showNotification('Ошибка', 'Можно расставлять только в своей зоне', 'error'); 
@@ -1859,7 +1883,7 @@ function startGamePolling() {
         }
 
         if (t.finished && t.winner) {
-          showGameResult(t.winner, t.reason);
+          showGameResult(t.winner === App.game.myPlayer ? App.game.myPlayer : 3 - App.game.myPlayer, t.reason);
         }
       }
     } catch (err) {
@@ -2022,7 +2046,7 @@ async function autoSetup() {
       App.game.allShipsPlaced = true;
       submitSetup();
     }
-  } catch (err) {
+    } catch (err) {
     showNotification('Ошибка', 'Ошибка автоматической расстановки: ' + err.message, 'error');
   }
 }
@@ -2113,7 +2137,7 @@ function showGameResult(winner, reason) {
   let reasonText = '';
   switch (reason) {
     case 'bases': reasonText = 'Уничтожены военно-морские базы'; break;
-     case 'moves': reasonText = 'Уничтожены все движущиеся корабли'; break;
+    case 'moves': reasonText = 'Уничтожены все движущиеся корабли'; break;
     case 'time': reasonText = 'Закончилось время'; break;
     case 'resign': reasonText = isWinner ? 'Противник сдался' : 'Вы сдались'; break;
     default: reasonText = 'Игра завершена';

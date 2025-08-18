@@ -40,7 +40,7 @@ body{
 
 /* Основная сцена */
 main{
-  position:relative; height:98%; width:90%;
+  position:relative; height:98%; width:98%; /* Увеличено до 98% */
   margin:1% auto;
   background:rgba(0,0,0,.7);
   border-radius:2.5vw; overflow:hidden;
@@ -50,7 +50,7 @@ main{
 
 /* Контейнер карточек */
 #msWrap{
-  height:90%; width:50%;
+  height:95%; width:95%; /* Увеличено до 95% */
   display:flex; justify-content:center; align-items:center;
 }
 
@@ -82,8 +82,8 @@ main{
 }
 
 .front{ opacity:1; visibility:visible; transform:rotateY(0deg); }
-.back{  opacity:0; visibility:hidden;  transform:rotateY(170deg); }
-.flip .front{ opacity:0; visibility:hidden; transform:rotateY(-170deg); }
+.back{  opacity:0; visibility:hidden;  transform:rotateY(180deg); } /* Изменено с 170deg на 180deg */
+.flip .front{ opacity:0; visibility:hidden; transform:rotateY(-180deg); } /* Изменено с -170deg на -180deg */
 .flip .back{  opacity:1; visibility:visible; transform:rotateY(0deg); }
 
 /* Фоны карточек */
@@ -127,6 +127,9 @@ main{
   background:rgba(0,0,0,0); color:#fff;
   border:.15vw outset #ffffff; border-radius:2.5vw;
   cursor:pointer; height:auto; width:64%; font-size:2vw; padding:.8rem 1rem;
+  white-space: nowrap; /* Предотвращает перенос текста */
+  overflow: hidden; /* Скрывает выходящий за границы текст */
+  text-overflow: ellipsis; /* Добавляет многоточие для обрезанного текста */
 }
 .menuButs.sm{ font-size:1.2vw; padding:.6rem 1.2rem; }
 .menuButs.xs{ font-size:0.9vw; padding:.4rem .8rem; border-radius:1.3rem; }
@@ -299,7 +302,7 @@ main{
   width:100%; 
   height:100%; 
   display:grid; 
-  grid-template-columns: 150px 1fr 150px; 
+  grid-template-columns: 120px 1fr 120px; /* Уменьшены боковые панели */
   grid-template-rows: auto 1fr auto; 
   gap:5px; 
   padding:5px; 
@@ -345,10 +348,10 @@ main{
   scrollbar-color: #80e4ff #222;
 }
 
-.side-panel-inner::-webkit-scrollbar { width: 8px; }
-.side-panel-inner::-webkit-scrollbar-track { background: linear-gradient(45deg, #222, #333); border-radius: 10px; margin: 6px 0; }
-.side-panel-inner::-webkit-scrollbar-thumb { background: linear-gradient(45deg, #80e4ff, #27e881); border-radius: 10px; border: 2px solid #222; }
-.side-panel-inner::-webkit-scrollbar-thumb:hover { background: linear-gradient(45deg, #27e881, #80e4ff); box-shadow: 0 0 10px rgba(128,228,255,0.5); }
+.side-panel-inner::-webkit-scrollbar { width:8px; }
+.side-panel-inner::-webkit-scrollbar-track { background:linear-gradient(45deg, #222, #333); border-radius:10px; margin:6px 0; }
+.side-panel-inner::-webkit-scrollbar-thumb { background:linear-gradient(45deg, #80e4ff, #27e881); border-radius:10px; border:2px solid #222; }
+.side-panel-inner::-webkit-scrollbar-thumb:hover { background:linear-gradient(45deg, #27e881, #80e4ff); box-shadow: 0 0 10px rgba(128,228,255,0.5); }
 
 /* Левая панель — флот */
 .ships-panel{
@@ -384,7 +387,7 @@ main{
   transition:all .3s; 
   text-shadow:0 0 5px rgba(255,255,255,.5); 
   margin-bottom:.5rem; 
-  font-size: 0.9rem;
+  font-size: 0.8rem; /* Уменьшен размер шрифта */
 }
 .ship-item:hover { text-shadow:0 0 10px rgba(255,255,255,1); }
 .ship-item.selected { text-shadow:0 0 15px rgba(255,255,0,1); color:#ffff00; }
@@ -426,7 +429,25 @@ main{
   background: rgba(0,0,0,.3);
   padding: 10px;
   overflow: hidden;
+  height: 150px; /* Увеличена высота с дефолтной до 150px */
+  position: relative;
 }
+
+.killed-table-container {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #80e4ff #222;
+}
+
+.killed-table-container::-webkit-scrollbar { width: 8px; }
+.killed-table-container::-webkit-scrollbar-track { background: linear-gradient(45deg, #222, #333); border-radius: 10px; margin: 6px 0; }
+.killed-table-container::-webkit-scrollbar-thumb { background: linear-gradient(45deg, #80e4ff, #27e881); border-radius: 10px; border: 2px solid #222; }
+.killed-table-container::-webkit-scrollbar-thumb:hover { background: linear-gradient(45deg, #27e881, #80e4ff); box-shadow: 0 0 10px rgba(128,228,255,0.5); }
 
 .control-item { 
   padding:.7rem .5rem; 
@@ -435,7 +456,7 @@ main{
   transition:all .3s; 
   margin-bottom:.5rem; 
   position:relative; 
-  font-size: 0.9rem;
+  font-size: 0.8rem; /* Уменьшен размер шрифта */
   text-shadow: 0 0 5px rgba(255,94,44,.5);
 }
 .control-item:hover { 
@@ -455,7 +476,7 @@ main{
   transition:all .3s; 
   margin-bottom:.5rem; 
   position:relative; 
-  font-size: 0.9rem;
+  font-size: 0.8rem; /* Уменьшен размер шрифта */
 }
 .control-button:hover { background:rgba(255,94,44,.3); box-shadow:0 0 10px rgba(255,94,44,.5); }
 .control-button.selected { border-color:#ffff00; box-shadow:0 0 15px rgba(255,255,0,.7); }
@@ -511,7 +532,7 @@ main{
   justify-content:center;
   font-weight:800; 
   letter-spacing:.5px; 
-  font-size:clamp(6px,1vw,12px);
+  font-size:clamp(6px, 0.7vw, 9px); /* Уменьшен размер шрифта */
   border-radius:5px;
 }
 
@@ -665,19 +686,19 @@ main{
 
 /* Адаптив */
 @media (max-width: 1200px){
-  #msWrap{ width:60%; }
+  #msWrap{ width:95%; }
   #menuHead{ font-size:9vw; }
   .menuButs{ font-size:2.5vw; }
-  .gameContent{ grid-template-columns: 160px 1fr 160px; }
-  .ship-item, .control-item, .control-button { font-size: 0.85rem; }
+  .gameContent{ grid-template-columns: 120px 1fr 120px; }
+  .ship-item, .control-item, .control-button { font-size: 0.75rem; }
 }
 @media (max-width: 900px){
-  #msWrap{ width:80%; }
+  #msWrap{ width:95%; }
   #menuHead{ font-size:10vw; }
   .menuButs{ font-size:3vw; width:70%; }
   .search input{ min-width:150px; }
-  .gameContent{ grid-template-columns: 140px 1fr 140px; }
-  .ship-item, .control-item, .control-button { font-size: 0.8rem; }
+  .gameContent{ grid-template-columns: 100px 1fr 100px; }
+  .ship-item, .control-item, .control-button { font-size: 0.7rem; }
 }
 @media (max-width: 600px){
   #msWrap{ width:95%; height:95%; }
