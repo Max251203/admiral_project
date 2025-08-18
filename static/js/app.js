@@ -101,6 +101,7 @@ const gameContent = document.getElementById('gameContent');
 
 const quickBtn = document.getElementById('quickBtn');
 const showMeBtn = document.getElementById('showMeBtn');
+
 const userSearch = document.getElementById('userSearch');
 const friendSearch = document.getElementById('friendSearch');
 const usersList = document.getElementById('usersList');
@@ -305,7 +306,7 @@ if(profileForm) profileForm.addEventListener('submit', async (e) => {
       renderTopRight();
       showNotification('Успех', 'Профиль сохранен', 'success');
       closeModal('profileModal');
-    } else {
+        } else {
       showNotification('Ошибка', 'Не удалось сохранить профиль', 'error');
     }
   }catch(err){ showNotification('Ошибка', 'Не удалось сохранить профиль: ' + err.message, 'error'); }
@@ -386,8 +387,8 @@ function renderUsersList(arr){
         <span class="muted">Рейтинг: ${rating} • Побед: ${u.wins || 0} • Поражений: ${u.losses || 0}</span>
       </div>
       ${!isMe ? `<div style="display:flex;gap:.4rem">
-        <button class="menuButs xs" data-invite="${u.id}">Пригласить</button>
-        <button class="menuButs xs" data-add="${u.id}" data-login="${u.login}">Добавить</button>
+        <button class="menuButs xs" data-invite="${u.id}">Игра</button>
+        <button class="menuButs xs" data-add="${u.id}" data-login="${u.login}">Друг</button>
       </div>` : '<div></div>'}`;
     usersList.appendChild(li);
   });
@@ -406,7 +407,7 @@ function renderUsersList(arr){
 if(userSearch) userSearch.addEventListener('input', () => loadUsers(userSearch.value.trim()));
 if(friendSearch) friendSearch.addEventListener('input', () => filterFriends(friendSearch.value.trim()));
 if(showMeBtn) showMeBtn.addEventListener('click', () => {
-    if(!App.isAuth) return;
+  if(!App.isAuth) return;
   const myItem = usersList.querySelector(`[data-login="${App.meLogin}"]`);
   if(myItem) {
     myItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -467,7 +468,7 @@ async function loadFriends(){
           <span class="muted">Рейтинг: ${rating} • Побед: ${u.wins || 0} • Поражений: ${u.losses || 0}</span>
         </div>
         <div style="display:flex;gap:.4rem">
-          <button class="menuButs xs" data-invite="${u.id}">Пригласить</button>
+          <button class="menuButs xs" data-invite="${u.id}">Игра</button>
           <button class="menuButs xs danger" data-remove="${u.id}">Удалить</button>
         </div>`;
       friendsList.appendChild(li);
@@ -585,6 +586,7 @@ function createGameUI() {
         <div class="tag">Таймер: <span id="hudTimer">15:00</span></div>
         <div class="tag">
           <button id="autoPlaceBtn" class="menuButs xs">Авто</button>
+          <button id="clearPlaceBtn" class="menuButs xs danger">Очистить</button>
         </div>
       </div>
       <div class="side-panel" id="leftPanel">
@@ -593,7 +595,7 @@ function createGameUI() {
       <div class="board-container">
         <div id="board" class="board"></div>
       </div>
-      <div class="side-panel" id="rightPanel">
+            <div class="side-panel" id="rightPanel">
         <div class="side-panel-inner" id="rightPanelInner"></div>
       </div>
       <div class="killed-section">
@@ -640,6 +642,7 @@ function createGameUI() {
   // Обновляем ссылки на DOM элементы
   const hudTimer = document.getElementById('hudTimer');
   const autoPlaceBtn = document.getElementById('autoPlaceBtn');
+  const clearPlaceBtn = document.getElementById('clearPlaceBtn');
   const pauseBtn = document.getElementById('pauseBtn');
   const resignBtn = document.getElementById('resignBtn');
   const leftPanelInner = document.getElementById('leftPanelInner');
@@ -649,6 +652,7 @@ function createGameUI() {
   
   // Добавляем обработчики
   if(autoPlaceBtn) autoPlaceBtn.addEventListener('click', autoSetup);
+  if(clearPlaceBtn) clearPlaceBtn.addEventListener('click', clearSetup);
   if(pauseBtn) pauseBtn.addEventListener('click', () => openPauseModal());
   if(resignBtn) resignBtn.addEventListener('click', () => openResignModal());
   
@@ -717,7 +721,7 @@ function createGameUI() {
     airstrikeBtn.className = 'control-button';
     airstrikeBtn.id = 'airstrikeBtn';
     airstrikeBtn.textContent = 'Воздушная атака';
-        airstrikeBtn.addEventListener('click', () => startSpecialAttack('airstrike'));
+    airstrikeBtn.addEventListener('click', () => startSpecialAttack('airstrike'));
     rightPanelInner.appendChild(airstrikeBtn);
     
     const bombBtn = document.createElement('div');
@@ -911,16 +915,6 @@ function clearBoard(){
   
   boardEl.innerHTML = '';
   
-  // Устанавливаем стили для игрового поля
-  boardEl.style.width = '100%';
-  boardEl.style.height = '100%';
-  boardEl.style.display = 'grid';
-  boardEl.style.gridTemplateColumns = 'repeat(14, 1fr)';
-  boardEl.style.gridTemplateRows = 'repeat(15, 1fr)';
-  boardEl.style.gap = '1px';
-  boardEl.style.border = '.12vw solid #80e4ff';
-  boardEl.style.background = 'linear-gradient(315deg,#4dff03,#00d0ff)';
-  
   for(let r = 0; r < 15; r++){
     for(let c = 0; c < 14; c++){
       const cell = document.createElement('div');
@@ -938,7 +932,7 @@ function clearBoard(){
         else if(r >= 10) cell.classList.add('enemy-zone'); 
       }
       
-      // Добавляем красные линии для зон
+            // Добавляем красные линии для зон
       if(r === 5 || r === 10) {
         cell.style.borderTop = '3px solid #ff0000';
       }
@@ -1071,7 +1065,7 @@ function showTorpedoDirections(tx, ty) {
     if(dir[0] === backDirection[0] && dir[1] === backDirection[1]) return;
     
     const nx = tx + dir[0], ny = ty + dir[1];
-        if(nx >= 0 && nx < 14 && ny >= 0 && ny < 15) {
+    if(nx >= 0 && nx < 14 && ny >= 0 && ny < 15) {
       highlightCell(nx, ny, 'valid-move');
     }
   });
@@ -1288,7 +1282,7 @@ function handleGroupSelection(x, y) {
       showNotification('Ошибка', 'Эта фишка уже в группе', 'error'); 
       return; 
     }
-    App.game.selectedGroup.push({x,y,kind:piece.dataset.kind}); 
+        App.game.selectedGroup.push({x,y,kind:piece.dataset.kind}); 
     cell.classList.add('group-selected'); 
     const ind = document.createElement('div'); 
     ind.className='group-indicator'; 
@@ -1406,7 +1400,7 @@ async function moveAndAttack(fx, fy, tx, ty){
       clone.style.width = srcRect.width + 'px';
       clone.style.height = srcRect.height + 'px';
       
-            // Вычисляем смещение для анимации
+      // Вычисляем смещение для анимации
       const moveX = dstRect.left - srcRect.left;
       const moveY = dstRect.top - srcRect.top;
       
@@ -1598,7 +1592,7 @@ async function moveGroup(toX, toY){
         let eventMessage = '';
         switch(res.res.event) {
           case 'move': eventMessage = 'Группа перемещена'; break;
-          case 'def_win': eventMessage = 'Ваша группа уничтожена'; break;
+                    case 'def_win': eventMessage = 'Ваша группа уничтожена'; break;
           case 'exchange': eventMessage = 'Обмен - обе группы уничтожены'; break;
           default: eventMessage = res.res.event;
         }
@@ -1718,6 +1712,29 @@ function checkAllShipsPlaced() {
   if(allPlaced && !App.game.allShipsPlaced) {
     App.game.allShipsPlaced = true;
     submitSetup(); // Автоматически подтверждаем расстановку
+  }
+}
+
+// Очистка расстановки
+async function clearSetup() {
+  try {
+    // Сначала получаем текущее состояние игры
+    const state = await api(`/game/state/${App.game.id}/`);
+    if (!state || !state.state || !state.state.board) {
+      showNotification('Ошибка', 'Не удалось получить состояние игры', 'error');
+      return;
+    }
+    
+    // Сбрасываем счетчики фишек
+    initializeShipCounts();
+    updateShipCounts();
+    
+    // Выполняем автоматическую расстановку, которая сначала очистит поле
+    await autoSetup();
+    
+    showNotification('Успех', 'Расстановка очищена', 'success');
+  } catch (err) {
+    showNotification('Ошибка', 'Не удалось очистить расстановку: ' + err.message, 'error');
   }
 }
 
@@ -1883,7 +1900,8 @@ function startGamePolling() {
         }
 
         if (t.finished && t.winner) {
-          showGameResult(t.winner === App.game.myPlayer ? App.game.myPlayer : 3 - App.game.myPlayer, t.reason);
+          const isWinner = t.winner === App.game.myPlayer;
+          showGameResult(isWinner ? App.game.myPlayer : 3 - App.game.myPlayer, t.reason);
         }
       }
     } catch (err) {
@@ -1901,8 +1919,7 @@ function updateTimers(data) {
     hudTimer.textContent = `${data.turn_left}s`;
     hudTimer.style.color = data.turn_left <= 10 ? '#ff5e2c' : '';
   }
-  
-  if (hudBank && typeof data.bank_left === 'number') {
+    if (hudBank && typeof data.bank_left === 'number') {
     const minutes = Math.floor(data.bank_left / 60), seconds = data.bank_left % 60;
     hudBank.textContent = `${minutes}:${String(seconds).padStart(2, '0')}`;
     hudBank.style.color = data.bank_left <= 60 ? '#ff5e2c' : '';
@@ -2046,7 +2063,7 @@ async function autoSetup() {
       App.game.allShipsPlaced = true;
       submitSetup();
     }
-    } catch (err) {
+  } catch (err) {
     showNotification('Ошибка', 'Ошибка автоматической расстановки: ' + err.message, 'error');
   }
 }
@@ -2192,3 +2209,5 @@ if (document.readyState === 'loading') {
 } else {
   init();
 }
+          
+    
