@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import room
 from .api.views import (
-    GetState, SetupAPI, SubmitSetup, AutoSetup,
+    GetState, SetupAPI, SubmitSetup, AutoSetup, ClearSetup,
     MoveAPI, TorpedoAPI, AirAPI, BombAPI, ResignAPI, PauseAPI,
     GameByCode, MyGames, UpdateStats, GameTimers, CancelPauseAPI, KilledPieces
 )
@@ -9,6 +9,7 @@ from .api.views import (
 urlpatterns = [
     path("state/<uuid:game_id>/", GetState.as_view(), name="game_state"),
     path("setup/<uuid:game_id>/", SetupAPI.as_view(), name="game_setup"),
+    path("clear_setup/<uuid:game_id>/", ClearSetup.as_view(), name="clear_setup"),
     path("submit_setup/<uuid:game_id>/", SubmitSetup.as_view(), name="submit_setup"),
     path("autosetup/<uuid:game_id>/", AutoSetup.as_view(), name="auto_setup"),
     path("move/<uuid:game_id>/", MoveAPI.as_view(), name="game_move"),
@@ -22,8 +23,6 @@ urlpatterns = [
     path("my/", MyGames.as_view(), name="my_games"),
     path("update_stats/", UpdateStats.as_view(), name="update_stats"),
     path("r/<str:code>/", room, name="room"),
-    # Добавить в urlpatterns
     path("cancel_pause/<uuid:game_id>/", CancelPauseAPI.as_view(), name="cancel_pause"),
-    # Добавить в urlpatterns
     path("killed/<uuid:game_id>/", KilledPieces.as_view(), name="killed_pieces"),
 ]
