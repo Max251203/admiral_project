@@ -15,7 +15,6 @@
     <div id="msWrap" class="front-back front flex-center">
       <div id="msContainer" class="flex-center">
         
-        <!-- МЕНЮ -->
         <div id="menu" class="front-back front">
           <div id="topRight">
             <button id="profileBtn" class="profile-btn">
@@ -30,7 +29,6 @@
           <button id="rulesBut" type="button" class="menuButs menu-font">ПРАВИЛА</button>
         </div>
 
-        <!-- ОСНОВНАЯ КАРТОЧКА -->
         <div id="settings" class="front-back back">
           <div class="card-inner">
             <div class="exit" id="settExit">
@@ -39,9 +37,8 @@
 
             <div id="settingsContent" style="width:100%; height:100%; display:flex; flex-direction:column;">
               
-              <!-- ПРАВИЛА -->
               <div id="rulesContent" class="content-pane" style="display:none;">
-                <h2 class="text-center" style="margin-bottom:1rem; color:#80e4ff">Правила игры "Адмирал"</h2>
+                <h2 style="text-align:center;margin-bottom:1rem;color:#80e4ff">Правила игры "Адмирал"</h2>
                 <div class="rules">
                   <div class="rules-inner">
                     <h3>Цель игры</h3>
@@ -51,16 +48,15 @@
                     <h3>Состав флота</h3>
                     <p><strong>БДК</strong> (2), <strong>КР</strong> (6), <strong>А</strong> (1), <strong>С</strong> (1), <strong>ТН</strong> (1), <strong>Л</strong> (2), <strong>ЭС</strong> (6), <strong>М</strong> (6), <strong>СМ</strong> (1), <strong>Ф</strong> (6), <strong>ТК</strong> (6), <strong>Т</strong> (6), <strong>ТР</strong> (6), <strong>СТ</strong> (6), <strong>ПЛ</strong> (1), <strong>КРПЛ</strong> (1), <strong>АБ</strong> (1), <strong>ВМБ</strong> (2)</p>
                     <h3>Ходы и время</h3>
-                    <p>Игроки ходят по очереди. На ход — 30 сек. Общий банк — 15 мин. Превышение — списание из банка. Пропуск хода запрещен.</p>
+                    <p>Игроки ходят по очереди. На ход — 30 сек. Общий банк — 15 мин. Превышение — списание из банка.</p>
                     <h3>Группы и атаки</h3>
-                    <p>Группа до 3 фишек одного типа, сила — сумма рейтингов. ПЛ бьет БДК и А; КРПЛ бьет КР. Атака происходит при входе на клетку соперника.</p>
+                    <p>Группа до 3 фишек одного типа. Сила — сумма рейтингов. ПЛ бьет БДК и А; КРПЛ бьет КР.</p>
                     <h3>Победа</h3>
                     <p>Уничтожение 2 ВМБ противника или всех подвижных фишек, либо истечение времени.</p>
                   </div>
-                </div>
+                                </div>
               </div>
 
-              <!-- ЛОББИ -->
               <div id="lobbyContent" class="content-pane" style="display:none;">
                 <div class="tabbar">
                   <button class="tab active" data-pane="pane-quick">Быстрая игра</button>
@@ -102,38 +98,8 @@
                 </div>
               </div>
 
-              <!-- ИГРА -->
               <div id="gameContent" class="content-pane" style="display:none;">
-                <div class="gameContent">
-                  <div class="game-hud">
-                    <div class="tag">Расстановка фишек</div>
-                    <div class="tag">Таймер: <span id="hudTimer">15:00</span></div>
-                    <div class="tag">
-                      <button id="autoPlaceBtn" class="menuButs xs">Авторасстановка</button>
-                    </div>
-                  </div>
-
-                  <div class="side-panel" id="leftPanel">
-                    <div class="side-panel-inner" id="leftPanelInner"></div>
-                  </div>
-
-                  <div class="board-container">
-                    <div id="board" class="board"></div>
-                  </div>
-
-                  <div class="side-panel" id="rightPanel">
-                    <div class="side-panel-inner" id="rightPanelInner"></div>
-                  </div>
-
-                  <div class="killed-section">
-                    <div class="killed-table-container">
-                      <table class="killed-table">
-                        <thead><tr><th>Тип</th><th>Убито</th><th>Всего</th></tr></thead>
-                        <tbody id="killedTableBody"></tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
+                <div class="gameContent"></div>
               </div>
 
             </div>
@@ -144,7 +110,6 @@
     </div>
   </main>
 
-  <!-- Профиль -->
   <div id="profileModal" class="modal-backdrop">
     <div class="modal">
       <div class="exit modal-close" data-target="profileModal">
@@ -174,7 +139,6 @@
     </div>
   </div>
 
-  <!-- Авторизация -->
   <div id="authModal" class="modal-backdrop">
     <div class="modal">
       <div class="exit modal-close" data-target="authModal">
@@ -204,7 +168,6 @@
     </div>
   </div>
 
-  <!-- Приглашение -->
   <div id="inviteModal" class="modal-backdrop">
     <div class="modal">
       <h3 id="inviteText" class="modalTitle">Приглашение в игру</h3>
@@ -215,7 +178,6 @@
     </div>
   </div>
 
-  <!-- Ожидание -->
   <div id="waitModal" class="modal-backdrop">
     <div class="modal">
       <div id="waitText" class="modalTitle">Ожидание...</div>
@@ -223,15 +185,13 @@
     </div>
   </div>
 
-  <!-- Ожидание соперника -->
   <div id="waitOpponentModal" class="modal-backdrop">
     <div class="modal">
       <h3 class="modalTitle">Ожидание соперника</h3>
-      <p class="text-center">Вы успешно расставили фишки и ожидаете, пока соперник завершит расстановку.</p>
+      <p style="text-align:center;">Вы успешно расставили фишки и ожидаете, пока соперник завершит расстановку.</p>
     </div>
   </div>
 
-  <!-- Результат игры -->
   <div id="gameResultModal" class="modal-backdrop">
     <div class="modal game-result-modal">
       <div class="exit" id="gameResultExit"><div class="exit-in"><div class="exit-txt">ВЫХОД</div></div></div>
@@ -241,7 +201,6 @@
     </div>
   </div>
 
-  <!-- Пауза -->
   <div id="pauseModal" class="modal-backdrop">
     <div class="modal pause-modal">
       <h3 class="modalTitle">Пауза</h3>
@@ -256,7 +215,6 @@
     </div>
   </div>
 
-  <!-- Оверлей паузы -->
   <div id="pauseModalOverlay" class="pause-modal-overlay" style="display: none;">
     <div class="pause-modal-content">
       <h2>ПАУЗА</h2>

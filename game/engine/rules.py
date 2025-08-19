@@ -1,12 +1,42 @@
 BOARD_W, BOARD_H = 14, 15
-RED_LINES = [5, 10]
 
-TYPES = ["BDK","KR","A","S","TN","L","ES","M","SM","F","TK","T","TR","ST","PL","KRPL","AB","VMB"]
+SHIP_TYPES = {
+    "BDK": {"count": 2, "rank": 18, "name": "БДК"},
+    "L": {"count": 2, "rank": 17, "name": "Л"},
+    "A": {"count": 1, "rank": 16, "name": "А"},
+    "KR": {"count": 6, "rank": 15, "name": "КР"},
+    "F": {"count": 6, "rank": 14, "name": "Ф"},
+    "ES": {"count": 6, "rank": 13, "name": "ЭС"},
+    "ST": {"count": 6, "rank": 12, "name": "СТ"},
+    "TR": {"count": 6, "rank": 11, "name": "ТР"},
+    "TK": {"count": 6, "rank": 10, "name": "ТК"},
+    "T": {"count": 6, "rank": 9, "name": "Т"},
+    "TN": {"count": 1, "rank": 8, "name": "ТН"},
+    "S": {"count": 1, "rank": 7, "name": "С"},
+    "PL": {"count": 1, "rank": 6, "name": "ПЛ"},
+    "KRPL": {"count": 1, "rank": 5, "name": "КРПЛ"},
+    "M": {"count": 6, "rank": 4, "name": "М"},
+    "SM": {"count": 1, "rank": 3, "name": "СМ"},
+    "AB": {"count": 1, "rank": 2, "name": "АБ"},
+    "VMB": {"count": 2, "rank": 1, "name": "ВМБ"},
+}
 
-RANK = {"BDK":18,"L":17,"A":16,"KR":15,"F":14,"ES":13,"ST":12,"TR":11,"TK":10,"T":9,"TN":8,"S":7,"PL":6,"KRPL":5,"M":4,"SM":3,"AB":2,"VMB":1}
+IMMOBILE_TYPES = {"VMB", "SM"}
+CARRIER_TYPES = {"ES": "M", "TK": "T", "A": "S"}
+SPECIAL_KILLS = {("PL", "BDK"), ("PL", "A"), ("KRPL", "KR")}
+EXPLOSIVE_TYPES = {"AB", "TN", "M", "SM"}
 
-IMMOBILE = {"VMB","SM"}
-CARRIER_OF = {"ES":"M","TK":"T","A":"S"}
-SPECIAL_KILLS = {("PL","BDK"),("PL","A"),("KRPL","KR")}
-SPECIAL_REVERSE = {("BDK","PL"),("A","PL"),("KR","KRPL")}
-COLORS = {"BDK":"#e74c3c","A":"#e74c3c","AB":"#c0392b","TK":"#27ae60","T":"#2ecc71","TR":"#1abc9c","KR":"#3498db","L":"#2980b9","F":"#1f8edb","ES":"#2ea2f2","ST":"#2c89c6","PL":"#0b4f6c","KRPL":"#07364b","M":"#95a5a6","SM":"#7f8c8d","TN":"#d35400","VMB":"#bdc3c7"}
+def get_ship_rank(ship_type):
+    return SHIP_TYPES.get(ship_type, {}).get("rank", 0)
+
+def is_immobile(ship_type):
+    return ship_type in IMMOBILE_TYPES
+
+def can_carry(carrier_type):
+    return CARRIER_TYPES.get(carrier_type)
+
+def is_special_kill(attacker, defender):
+    return (attacker, defender) in SPECIAL_KILLS
+
+def is_explosive(ship_type):
+    return ship_type in EXPLOSIVE_TYPES

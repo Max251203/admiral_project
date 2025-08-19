@@ -11,9 +11,7 @@ SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret")
 DEBUG = os.getenv("DEBUG", "True") == "True"
 ALLOWED_HOSTS = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "*").split(",")]
 
-# Удалите или закомментируйте эти строки
 INSTALLED_APPS = [
-    # "daphne",  # Удалите эту строку
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -22,7 +20,6 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "corsheaders",
-    # "channels",  # Удалите эту строку
     "accounts",
     "game",
     "matchmaking",
@@ -99,14 +96,6 @@ MESSAGE_TAGS = {
     messages.WARNING: "warning",
     messages.ERROR: "error",
 }
-
-# Игровые константы
-GRID_ROWS = 15
-GRID_COLS = 14
-RED_LINES = [5,10]
-TURN_SECONDS = 30
-BANK_MINUTES = 15
-SETUP_MINUTES = 15
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
