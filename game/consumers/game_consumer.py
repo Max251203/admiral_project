@@ -85,7 +85,6 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
                     # Пауза закончилась, возвращаемся к игре
                     g.status = f"TURN_P{g.turn}"
                     g.pause_until = None
-                    # НЕ сбрасываем turn_start_time - продолжаем с того же момента
                     g.save()
                 else:
                     # Пауза еще активна
@@ -106,38 +105,73 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
                     "reason": g.win_reason
                 }
             
-            # Инициализируем turn_start_time если нужно
-            if not g.turn_start_time:
-                g.turn_start_time = current_time
+            # ИСПРАВЛЕНО: Индивидуальные таймеры для каждого игрока
+            current_player = g.turn
+            
+            # Инициализируем таймеры если нужно
+            if current_player == 1 and not g.turn_start_time_p1:
+                g.turn_start_time_p1 = current_time
+                g.save()
+            elif current_player == 2 and not g.turn_start_time_p2:
+                g.turn_start_time_p2 = current_time
                 g.save()
             
-            # ИСПРАВЛЕНО: Правильная логика таймеров
-            turn_elapsed = current_time - g.turn_start_time
-            turn_left = max(0, 30 - int(turn_elapsed))
+            # Получаем данные текущего игрока
+            if current_player == 1:
+                turn_start = g.turn_start_time_p1
+                bank_ms = g.bank_ms_p1
+                last_bank_update = g.last_bank_update_p1
+            else:
+                turn_start = g.turn_start_time_p2
+                bank_ms = g.bank_ms_p2
+                last_bank_update = g.last_bank_update_p2
             
-            # Определяем банк времени текущего игрока
-            bank_attr = "bank_ms_p1" if g.turn == 1 else "bank_ms_p2"
-            bank_ms = getattr(g, bank_attr)
+            if not turn_start:
+                return {"turn": g.turn, "turn_left": 30, "bank_left": bank_ms // 1000}
+            
+            # Вычисляем время хода
+            turn_elapsed = current_time - turn_start
+            turn_left = max(0, 30 - int(turn_elapsed))
             bank_seconds = bank_ms // 1000
             
-                        # ИСПРАВЛЕНО: Если время хода истекло, начинаем списывать банк
+            # ИСПРАВЛЕНО: Если время хода истекло, списываем банк по 1 секунде
             if turn_left == 0 and turn_elapsed > 30:
                 # Время хода истекло, списываем из банка
-                overtime_seconds = turn_elapsed - 30
-                bank_ms = max(0, bank_ms - int(overtime_seconds * 1000))
-                setattr(g, bank_attr, bank_ms)
-                bank_seconds = bank_ms // 1000
+                if last_bank_update is None:
+                    last_bank_update = turn_start + 30
+                    if current_player == 1:
+                        g.last_bank_update_p1 = last_bank_update
+                    else:
+                        g.last_bank_update_p2 = last_bank_update
+                
+                seconds_since_update = current_time - last_bank_update
+                
+                if seconds_since_update >= 1.0:
+                    seconds_to_deduct = int(seconds_since_update)
+                    bank_ms = max(0, bank_ms - (seconds_to_deduct * 1000))
+                    
+                    if current_player == 1:
+                        g.bank_ms_p1 = bank_ms
+                        g.last_bank_update_p1 = current_time
+                    else:
+                        g.bank_ms_p2 = bank_ms
+                        g.last_bank_update_p2 = current_time
+                    
+                    bank_seconds = bank_ms // 1000
                 
                 # Проверяем окончание банка времени
                 if bank_seconds <= 0:
                     g.status = "FINISHED"
-                    g.winner_id = g.player2_id if g.turn == 1 else g.player1_id
+                    g.winner_id = g.player2_id if current_player == 1 else g.player1_id
                     g.win_reason = "time"
-                    g.turn_start_time = None
+                    g.turn_start_time_p1 = None
+                    g.turn_start_time_p2 = None
+                    g.last_bank_update_p1 = None
+                    g.last_bank_update_p2 = None
                     
                     # Обновляем статистику игроков
-                    winner = g.player2 if g.turn == 1 else g.player1
-                    loser = g.player1 if g.turn == 1 else g.player2
+                    winner = g.player2 if current_player == 1 else g.player1
+                    loser = g.player1 if current_player == 1 else g.player2
                     
                     winner.profile.wins += 1
                     winner.profile.rating_elo += 100
@@ -151,7 +185,7 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
                     try:
                         st = GameState.objects.get(game=g)
                         st.data["phase"] = "FINISHED"
-                        st.data["winner"] = 2 if g.turn == 1 else 1
+                        st.data["winner"] = 2 if current_player == 1 else 1
                         st.data["win_reason"] = "time"
                         st.save()
                     except GameState.DoesNotExist:
@@ -168,10 +202,15 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
             
             g.save()
             
+            # ИСПРАВЛЕНО: Возвращаем данные для обоих игроков
+            p1_bank = g.bank_ms_p1 // 1000
+            p2_bank = g.bank_ms_p2 // 1000
+            
             return {
                 "turn": g.turn,
                 "turn_left": turn_left,
-                "bank_left": bank_seconds,
+                "bank_left_p1": p1_bank,
+                "bank_left_p2": p2_bank,
                 "finished": False
             }
         except Game.DoesNotExist:

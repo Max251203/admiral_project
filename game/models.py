@@ -12,12 +12,20 @@ class Game(models.Model):
     status = models.CharField(max_length=16, default="SETUP")
     turn = models.IntegerField(default=1)
     
-    bank_ms_p1 = models.IntegerField(default=15*60*1000)
-    bank_ms_p2 = models.IntegerField(default=15*60*1000)
+    # ИСПРАВЛЕНО: Индивидуальные таймеры для каждого игрока
+    bank_ms_p1 = models.IntegerField(default=15*60*1000)  # 15 минут в миллисекундах
+    bank_ms_p2 = models.IntegerField(default=15*60*1000)  # 15 минут в миллисекундах
+    
+    # Таймеры хода для каждого игрока
+    turn_start_time_p1 = models.FloatField(null=True, blank=True)  # Unix timestamp начала хода игрока 1
+    turn_start_time_p2 = models.FloatField(null=True, blank=True)  # Unix timestamp начала хода игрока 2
+    last_bank_update_p1 = models.FloatField(null=True, blank=True)  # Последнее обновление банка игрока 1
+    last_bank_update_p2 = models.FloatField(null=True, blank=True)  # Последнее обновление банка игрока 2
     
     setup_deadline_at = models.DateTimeField(null=True, blank=True)
     turn_deadline_at = models.DateTimeField(null=True, blank=True)
-    turn_start_time = models.FloatField(null=True, blank=True)  # Unix timestamp
+    turn_start_time = models.FloatField(null=True, blank=True)  # Общий таймер (оставляем для совместимости)
+    last_bank_update = models.FloatField(null=True, blank=True)  # Общий банк (оставляем для совместимости)
     
     ready_p1 = models.BooleanField(default=False)
     ready_p2 = models.BooleanField(default=False)
