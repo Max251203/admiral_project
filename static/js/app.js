@@ -59,6 +59,7 @@ const App = {
   }
 };
 
+// Все элементы DOM
 const msContainer = document.getElementById('msContainer');
 const settings = document.getElementById('settings');
 const settExit = document.getElementById('settExit');
@@ -110,6 +111,9 @@ const resultDetails = document.getElementById('resultDetails');
 const ratingChange = document.getElementById('ratingChange');
 
 function showContent(contentType){
+  // Очищаем все выделения при переходе между экранами
+  clearAllHighlights();
+  
   [rulesContent, lobbyContent, gameContent].forEach(p => p && (p.style.display = 'none'));
   if(contentType === 'rules'){ rulesContent.style.display = 'block'; }
   else if(contentType === 'lobby'){ lobbyContent.style.display = 'block'; activateLobbyTab('pane-quick'); initTabs(); }
@@ -117,7 +121,17 @@ function showContent(contentType){
   msContainer.classList.add('flip');
 }
 
+function clearAllHighlights() {
+  // Убираем все выделения с игрового поля
+  document.querySelectorAll('.cell').forEach(cell => {
+    cell.classList.remove('selected', 'valid-move', 'group-candidate', 'torpedo-direction', 'air-attack-zone', 'group-selected', 'my-zone', 'enemy-zone');
+    cell.removeAttribute('data-torpedo-dir');
+  });
+  document.querySelectorAll('.group-indicator').forEach(ind => ind.remove());
+}
+
 function showMenu(){
+  clearAllHighlights();
   msContainer.classList.remove('flip');
   if(App.game.pollTimer){ clearInterval(App.game.pollTimer); App.game.pollTimer = null; }
   if(App.game.setupTimer){ clearInterval(App.game.setupTimer); App.game.setupTimer = null; }
@@ -180,6 +194,7 @@ function initTabs(){
   });
 }
 
+// Обработчики событий
 if(startBut) startBut.addEventListener('click', () => { showContent('lobby'); setTimeout(() => { loadUsers(''); loadFriends(); }, 100); });
 if(rulesBut) rulesBut.addEventListener('click', () => showContent('rules'));
 if(settExit){
@@ -271,7 +286,7 @@ if(loginForm) loginForm.addEventListener('submit', async (e) => {
     if(r.ok){
       App.isAuth=true; App.meLogin=r.login||d.username; if(r.avatar) App.meAvatar=r.avatar;
       renderTopRight(); authModal.style.display='none';
-      showNotification('Успех', 'Вы успешно вошли в систему', 'success');
+            showNotification('Успех', 'Вы успешно вошли в систему', 'success');
     }else showNotification('Ошибка', 'Неверный логин или пароль', 'error');
   }catch(err){ showNotification('Ошибка', 'Ошибка входа в систему', 'error'); }
 });
@@ -498,7 +513,7 @@ async function inviteUser(userId) {
       }, res.token);
     }
   } catch(err) {
-        showNotification('Ошибка', 'Не удалось отправить приглашение', 'error');
+    showNotification('Ошибка', 'Не удалось отправить приглашение', 'error');
   }
 }
 
@@ -530,11 +545,13 @@ function fitBoard(){
   board.style.top = '50%';
   board.style.transform = 'translate(-50%, -50%)';
   
-  // Поворот поля для игрока 2
-  if(App.game.myPlayer === 2) {
-    board.classList.add('player2');
-  } else {
+  // ИСПРАВЛЕНО: Поворот поля для игрока 1 (его зона должна быть внизу)
+  if(App.game.myPlayer === 1) {
+    board.classList.add('player1');
     board.classList.remove('player2');
+  } else {
+    board.classList.add('player2');
+    board.classList.remove('player1');
   }
   
   board.querySelectorAll('.piece').forEach(p => {
@@ -556,7 +573,7 @@ function createGameUI() {
         <button id="submitSetupBtn" class="menuButs xs">Готов</button>
       ` : `
         <div class="tag" id="turnIndicator">Ваш ход</div>
-        <div class="tag">Ход: <span id="hudTimer">30s</span></div>
+                <div class="tag">Ход: <span id="hudTimer">30s</span></div>
         <div class="tag">Банк: <span id="hudBank">15:00</span></div>
         <button id="pauseBtn" class="menuButs xs">Пауза</button>
         <button id="resignBtn" class="menuButs xs danger">Сдаться</button>
@@ -615,8 +632,14 @@ function renderFleetPanels(leftPanel, rightPanel) {
     item.className = 'fleet-item';
     item.dataset.ship = type;
     
-    // В фазе игры показываем общее количество, в расстановке - оставшееся
-    const count = App.game.setupPhase ? (App.game.shipCounts[type] || 0) : SHIP_TYPES[type].count;
+    // ИСПРАВЛЕНО: В фазе игры показываем общее количество (не зависит от shipCounts)
+    let count;
+    if(App.game.setupPhase) {
+      count = App.game.shipCounts[type] || 0;
+    } else {
+      count = SHIP_TYPES[type].count;
+    }
+    
     item.innerHTML = `${type} (${count})`;
     
     // Проверяем зависимые фишки
@@ -638,7 +661,13 @@ function renderFleetPanels(leftPanel, rightPanel) {
     item.className = 'fleet-item';
     item.dataset.ship = type;
     
-    const count = App.game.setupPhase ? (App.game.shipCounts[type] || 0) : SHIP_TYPES[type].count;
+    let count;
+    if(App.game.setupPhase) {
+      count = App.game.shipCounts[type] || 0;
+    } else {
+      count = SHIP_TYPES[type].count;
+    }
+    
     item.innerHTML = `${type} (${count})`;
     
     // Проверяем зависимые фишки
@@ -685,11 +714,12 @@ function clearBoard(){
       cell.dataset.x = c;
       cell.dataset.y = r;
       
-      // Зоны игроков (с учетом поворота для игрока 2)
+      // ИСПРАВЛЕНО: Зоны игроков (игрок 1 - зона внизу, игрок 2 - зона вверху после поворота)
       if(App.game.myPlayer === 1) {
         if(r >= 10) cell.classList.add('my-zone');
         else if(r < 5) cell.classList.add('enemy-zone');
       } else {
+        // Для игрока 2 поле повернуто, поэтому зоны инвертированы
         if(r < 5) cell.classList.add('my-zone');
         else if(r >= 10) cell.classList.add('enemy-zone');
       }
@@ -749,7 +779,7 @@ async function handleGameClick(x, y, cell) {
     return;
   }
   
-  // Если есть выбранная фишка
+  // ИСПРАВЛЕНО: Если есть выбранная фишка и кликнули на валидный ход
   if(App.game.selectedPiece) {
     if(App.game.selectedPiece.x === x && App.game.selectedPiece.y === y) {
       clearSelection();
@@ -761,8 +791,7 @@ async function handleGameClick(x, y, cell) {
       await movePiece(App.game.selectedPiece.x, App.game.selectedPiece.y, x, y);
       return;
     } else {
-      clearSelection();
-      showHint('Выбор отменен');
+      // НЕ очищаем выделение сразу, позволяем выбрать другую фишку
     }
   }
   
@@ -783,7 +812,7 @@ async function handleGameClick(x, y, cell) {
     return;
   }
   
-  // Выбор новой фишки
+  // Выбор новой фишки (очищаем предыдущее выделение)
   if(piece && parseInt(piece.dataset.owner) === App.game.myPlayer) {
     await selectPiece(x, y, piece);
   } else if(piece && parseInt(piece.dataset.owner) !== App.game.myPlayer) {
@@ -855,7 +884,7 @@ async function addToGroup(x, y) {
     cell.appendChild(indicator);
   });
   
-    // Вычисляем силу группы
+  // Вычисляем силу группы
   const groupStrength = App.game.selectedGroup.reduce((sum, coord) => {
     const piece = getCellElement(coord.x, coord.y).querySelector('.piece');
     if(piece) {
@@ -904,7 +933,7 @@ async function showValidMoves(x, y, pieceType) {
       const nx = x + dir.dx;
       const ny = y + dir.dy;
       
-      if(nx >= 0 && nx < 14 && ny >= 0 && ny < 15) {
+            if(nx >= 0 && nx < 14 && ny >= 0 && ny < 15) {
         const cell = getCellElement(nx, ny);
         const piece = cell.querySelector('.piece');
         
@@ -1226,7 +1255,7 @@ function handleMoveResult(result) {
       showExplosionEffect();
       break;
     case 'mine_explosion':
-            showNotification('Мина!', 'Ваша фишка подорвалась на мине', 'error');
+      showNotification('Мина!', 'Ваша фишка подорвалась на мине', 'error');
       break;
     case 'mine_cleared':
       showNotification('Тральщик', 'Мина успешно обезврежена', 'success');
@@ -1260,12 +1289,12 @@ function showExplosionEffect() {
 }
 
 async function placeShip(x, y, shipType) {
-  // Проверяем зону размещения с учетом поворота поля
+  // ИСПРАВЛЕНО: Проверяем зону размещения с учетом поворота поля
   let validZone;
   if(App.game.myPlayer === 1) {
-    validZone = y >= 10;
+    validZone = y >= 10; // Для игрока 1 зона внизу (строки 10-14)
   } else {
-    validZone = y <= 4;
+    validZone = y <= 4;  // Для игрока 2 зона вверху (строки 0-4)
   }
   
   if(!validZone) {
@@ -1273,7 +1302,7 @@ async function placeShip(x, y, shipType) {
     return;
   }
   
-  if(App.game.shipCounts[shipType] <= 0) {
+    if(App.game.shipCounts[shipType] <= 0) {
     showNotification('Ошибка', 'Корабли этого типа закончились', 'error');
     return;
   }
@@ -1412,7 +1441,13 @@ function convertFromApiShipType(t) {
 function updateShipCounts() {
   Object.keys(SHIP_TYPES).forEach(type => {
     document.querySelectorAll(`[data-ship="${type}"]`).forEach(item => {
-      const count = App.game.setupPhase ? (App.game.shipCounts[type] || 0) : SHIP_TYPES[type].count;
+      let count;
+      if(App.game.setupPhase) {
+        count = App.game.shipCounts[type] || 0;
+      } else {
+        count = SHIP_TYPES[type].count;
+      }
+      
       item.innerHTML = `${type} (${count})`;
       if(App.game.setupPhase) {
         if(count <= 0) {
@@ -1563,24 +1598,33 @@ function startGamePolling() {
   }, 1000);
 }
 
+// ИСПРАВЛЕНО: Обновленная функция updateTimers с правильной логикой банка времени
 function updateTimers(data) {
   const hudTimer = document.getElementById('hudTimer');
   const hudBank = document.getElementById('hudBank');
   const turnIndicator = document.getElementById('turnIndicator');
   
-  if(hudTimer && typeof data.turn_left === 'number') {
-    hudTimer.textContent = `${data.turn_left}s`;
-    hudTimer.style.color = data.turn_left <= 10 ? '#ff5e2c' : '';
+  // ИСПРАВЛЕНО: Показываем банк времени когда время хода истекло
+  if(hudTimer && hudBank) {
+    if(typeof data.turn_left === 'number' && data.turn_left > 0) {
+      // Показываем время хода
+      hudTimer.textContent = `${data.turn_left}s`;
+      hudTimer.style.color = data.turn_left <= 10 ? '#ff5e2c' : '';
+    } else {
+      // Время хода истекло, показываем банк
+      hudTimer.textContent = 'Банк';
+      hudTimer.style.color = '#ff5e2c';
+    }
+    
+    if(typeof data.bank_left === 'number') {
+      const minutes = Math.floor(data.bank_left / 60);
+      const seconds = data.bank_left % 60;
+      hudBank.textContent = `${minutes}:${String(seconds).padStart(2, '0')}`;
+      hudBank.style.color = data.bank_left <= 60 ? '#ff5e2c' : '';
+    }
   }
   
-  if(hudBank && typeof data.bank_left === 'number') {
-    const minutes = Math.floor(data.bank_left / 60);
-    const seconds = data.bank_left % 60;
-    hudBank.textContent = `${minutes}:${String(seconds).padStart(2, '0')}`;
-    hudBank.style.color = data.bank_left <= 60 ? '#ff5e2c' : '';
-  }
-  
-    if(turnIndicator && typeof data.turn !== 'undefined' && !App.game.setupPhase) {
+  if(turnIndicator && typeof data.turn !== 'undefined' && !App.game.setupPhase) {
     const isMyTurn = (data.turn === App.game.myPlayer);
     turnIndicator.textContent = isMyTurn ? 'Ваш ход' : 'Ход соперника';
     turnIndicator.style.color = isMyTurn ? '#27e881' : '#ff5e2c';
@@ -1608,7 +1652,7 @@ function showPauseOverlay(seconds, isInitiator) {
     
     const cancelPauseBtn2 = document.getElementById('cancelPauseBtn2');
     if(cancelPauseBtn2) {
-      cancelPauseBtn2.onclick = async () => {
+            cancelPauseBtn2.onclick = async () => {
         try {
           await api(`/game/cancel_pause/${App.game.id}/`, 'POST');
           hidePauseOverlay();
@@ -1825,9 +1869,6 @@ function renderGame() {
     }
   });
   
-  // Показываем связи между носителями и переносимыми фишками
-  renderCarrierLinks();
-  
   fitBoard();
   updateKilledTable();
   
@@ -1837,66 +1878,6 @@ function renderGame() {
       document.getElementById('rightPanelInner')
     );
   }
-}
-
-function renderCarrierLinks() {
-  // Удаляем старые связи
-  document.querySelectorAll('.carrier-link').forEach(link => link.remove());
-  
-  const board = App.game.state?.board || {};
-  
-  Object.keys(board).forEach(coordKey => {
-    const [x, y] = coordKey.split(',').map(Number);
-    const pieceData = board[coordKey];
-    
-    if(pieceData && pieceData.owner === App.game.myPlayer) {
-      const carriedType = CARRIER_TYPES[convertFromApiShipType(pieceData.kind)];
-      
-      if(carriedType) {
-        // Ищем переносимые фишки рядом
-        const directions = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
-        
-        directions.forEach(dir => {
-          const nx = x + dir.dx;
-          const ny = y + dir.dy;
-          const adjCoordKey = `${nx},${ny}`;
-          const adjPieceData = board[adjCoordKey];
-          
-          if(adjPieceData && 
-             adjPieceData.owner === App.game.myPlayer && 
-             convertFromApiShipType(adjPieceData.kind) === carriedType) {
-            
-            // Создаем визуальную связь
-            const carrierCell = getCellElement(x, y);
-            const carriedCell = getCellElement(nx, ny);
-            
-            if(carrierCell && carriedCell) {
-              const link = document.createElement('div');
-              link.className = 'carrier-link';
-              
-              const carrierRect = carrierCell.getBoundingClientRect();
-              const carriedRect = carriedCell.getBoundingClientRect();
-              
-              const centerX1 = carrierRect.left + carrierRect.width / 2;
-              const centerY1 = carrierRect.top + carrierRect.height / 2;
-              const centerX2 = carriedRect.left + carriedRect.width / 2;
-              const centerY2 = carriedRect.top + carriedRect.height / 2;
-              
-              const length = Math.sqrt(Math.pow(centerX2 - centerX1, 2) + Math.pow(centerY2 - centerY1, 2));
-              const angle = Math.atan2(centerY2 - centerY1, centerX2 - centerX1) * 180 / Math.PI;
-              
-              link.style.width = length + 'px';
-              link.style.left = centerX1 + 'px';
-              link.style.top = centerY1 + 'px';
-              link.style.transform = `rotate(${angle}deg)`;
-              
-              document.body.appendChild(link);
-            }
-          }
-        });
-      }
-    }
-  });
 }
 
 function getShipClass(apiType) {

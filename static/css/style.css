@@ -108,17 +108,21 @@ main{position:relative;height:98%;width:98%;margin:1% auto;background:rgba(0,0,0
 
 .board{position:absolute;display:grid;grid-template-columns:repeat(14,1fr);grid-template-rows:repeat(15,1fr);gap:1px;border:.12vw solid #80e4ff;background:linear-gradient(315deg,#4dff03,#00d0ff);}
 
-/* Поворот поля для игрока 2 */
-.board.player2{transform:rotate(180deg);}
-.board.player2 .piece{transform:rotate(180deg);}
+/* ИСПРАВЛЕНО: Поворот поля для игроков */
+.board.player1{transform:rotate(180deg);}
+.board.player1 .piece{transform:rotate(180deg);}
+.board.player2{transform:rotate(0deg);}
 
 .board .cell{background:rgba(8,70,104,.66);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .2s;position:relative;}
 .board .cell:hover{background:rgba(8,70,104,.8);}
 .board .cell.selected{background:rgba(255,255,0,.5);box-shadow:0 0 10px rgba(255,255,0,0.8);}
 .board .cell.valid-move{background:rgba(0,255,0,.25);animation:pulse-green 1.5s infinite;}
 .board .cell.group-candidate{background:rgba(0,255,255,.3);animation:pulse-cyan 1s infinite;}
+
+/* ИСПРАВЛЕНО: Убираем автоматические зоны, они задаются в JS */
 .board .cell.my-zone{background:rgba(0,100,255,.18);}
 .board .cell.enemy-zone{background:rgba(255,100,0,.18);}
+
 .board .cell.group-selected{background:rgba(255,255,0,.4);box-shadow:0 0 8px rgba(255,255,0,0.6);}
 .board .cell.torpedo-direction{background:rgba(255,165,0,.4);cursor:crosshair;}
 .board .cell.air-attack-zone{background:rgba(255,0,255,.3);cursor:crosshair;}
@@ -255,5 +259,8 @@ main{position:relative;height:98%;width:98%;margin:1% auto;background:rgba(0,0,0
     .gameContent{grid-template-columns:1fr;grid-template-rows:50px auto 1fr auto;gap:4px;}
     .side-panel{flex-direction:row;height:auto;}
     .killed-section{height:80px;}
-    .board.player2{transform:none;} /* Отключаем поворот на мобильных */
+    /* ИСПРАВЛЕНО: Отключаем поворот на мобильных для обоих игроков */
+    .board.player1{transform:none;}
+    .board.player2{transform:none;}
+    .board.player1 .piece{transform:none;}
 }

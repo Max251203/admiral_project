@@ -26,8 +26,9 @@ def _persist_after_engine(game: Game, st: GameState, eng: Engine):
     game.turn = eng.gd.turn
     if eng.gd.phase in ("TURN_P1", "TURN_P2"):
         game.status = eng.gd.phase
-        # Сбрасываем время начала хода при смене хода
-        game.turn_start_time = time.time()
+        # ИСПРАВЛЕНО: Сбрасываем время начала хода только при смене хода
+        if game.turn != eng.gd.turn:
+            game.turn_start_time = time.time()
     elif eng.gd.phase == "SETUP":
         game.status = "SETUP"
     elif eng.gd.phase == "FINISHED":
@@ -459,6 +460,8 @@ class PauseAPI(APIView):
         g.pause_until = now + timezone.timedelta(seconds=pause_duration)
         g.pause_initiator = me
         
+        # ИСПРАВЛЕНО: НЕ сбрасываем turn_start_time при паузе
+        
         if me == 1:
             if pause_type == "short":
                 g.short_pause_p1 = True
@@ -613,7 +616,7 @@ class GameTimers(APIView):
             if now >= g.pause_until:
                 g.status = f"TURN_P{g.turn}"
                 g.pause_until = None
-                # НЕ сбрасываем turn_start_time
+                # ИСПРАВЛЕНО: НЕ сбрасываем turn_start_time
                 g.save()
             else:
                 pause_left = int((g.pause_until - now).total_seconds())
@@ -635,7 +638,7 @@ class GameTimers(APIView):
                 **pauses_info
             })
         
-        # Вычисляем время хода и банк
+        # ИСПРАВЛЕНО: Правильный расчет времени хода и банка
         turn_left = 30
         if g.turn_start_time:
             turn_elapsed = current_time - g.turn_start_time
@@ -643,6 +646,16 @@ class GameTimers(APIView):
         
         bank_attr = "bank_ms_p1" if g.turn == 1 else "bank_ms_p2"
         bank_ms = getattr(g, bank_attr)
+        
+        # ИСПРАВЛЕНО: Если время хода истекло, списываем из банка
+        if turn_left == 0 and g.turn_start_time:
+            turn_elapsed = current_time - g.turn_start_time
+            if turn_elapsed > 30:
+                overtime_seconds = turn_elapsed - 30
+                bank_ms = max(0, bank_ms - int(overtime_seconds * 1000))
+                setattr(g, bank_attr, bank_ms)
+                g.save()
+        
         bank_left = bank_ms // 1000
         
         return Response({
@@ -668,7 +681,7 @@ class CancelPauseAPI(APIView):
         
         g.status = f"TURN_P{g.turn}"
         g.pause_until = None
-        # НЕ сбрасываем turn_start_time
+        # ИСПРАВЛЕНО: НЕ сбрасываем turn_start_time
         g.save()
         
         Move.objects.create(

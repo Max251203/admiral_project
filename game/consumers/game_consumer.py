@@ -4,6 +4,7 @@ from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from django.utils import timezone
 from asgiref.sync import sync_to_async
 from ..models import Game, GameState
+import time
 
 class GameConsumer(AsyncJsonWebsocketConsumer):
     async def connect(self):
@@ -67,6 +68,7 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
         try:
             g = Game.objects.select_for_update().get(id=self.game_id)
             now = timezone.now()
+            current_time = time.time()
             
             # Если игра завершена, не тикаем
             if g.status == "FINISHED":
@@ -83,7 +85,7 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
                     # Пауза закончилась, возвращаемся к игре
                     g.status = f"TURN_P{g.turn}"
                     g.pause_until = None
-                    g.turn_deadline_at = now + timezone.timedelta(seconds=30)
+                    # НЕ сбрасываем turn_start_time - продолжаем с того же момента
                     g.save()
                 else:
                     # Пауза еще активна
@@ -92,7 +94,7 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
                         "turn": g.turn,
                         "paused": True,
                         "pause_left": pause_left,
-                        "pause_initiator": g.pause_initiator  # Добавляем информацию о том, кто инициировал паузу
+                        "pause_initiator": g.pause_initiator
                     }
             
             # Если игра не активна, не тикаем
@@ -104,71 +106,73 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
                     "reason": g.win_reason
                 }
             
-            # Инициализируем last_tick_at если нужно
-            if not g.last_tick_at:
-                g.last_tick_at = now
+            # Инициализируем turn_start_time если нужно
+            if not g.turn_start_time:
+                g.turn_start_time = current_time
+                g.save()
             
-            # Вычисляем превышение времени хода
-            overflow = 0
-            if g.turn_deadline_at:
-                overflow = max(0, (now - g.turn_deadline_at).total_seconds())
-            
-            # Вычисляем время с последнего тика
-            delta = (now - g.last_tick_at).total_seconds()
+            # ИСПРАВЛЕНО: Правильная логика таймеров
+            turn_elapsed = current_time - g.turn_start_time
+            turn_left = max(0, 30 - int(turn_elapsed))
             
             # Определяем банк времени текущего игрока
             bank_attr = "bank_ms_p1" if g.turn == 1 else "bank_ms_p2"
-            bank = getattr(g, bank_attr)
+            bank_ms = getattr(g, bank_attr)
+            bank_seconds = bank_ms // 1000
             
-            # Если есть превышение, списываем из банка
-            if overflow > 0:
-                bank = max(0, bank - int(delta * 1000))
-                setattr(g, bank_attr, bank)
+                        # ИСПРАВЛЕНО: Если время хода истекло, начинаем списывать банк
+            if turn_left == 0 and turn_elapsed > 30:
+                # Время хода истекло, списываем из банка
+                overtime_seconds = turn_elapsed - 30
+                bank_ms = max(0, bank_ms - int(overtime_seconds * 1000))
+                setattr(g, bank_attr, bank_ms)
+                bank_seconds = bank_ms // 1000
+                
+                # Проверяем окончание банка времени
+                if bank_seconds <= 0:
+                    g.status = "FINISHED"
+                    g.winner_id = g.player2_id if g.turn == 1 else g.player1_id
+                    g.win_reason = "time"
+                    g.turn_start_time = None
+                    
+                    # Обновляем статистику игроков
+                    winner = g.player2 if g.turn == 1 else g.player1
+                    loser = g.player1 if g.turn == 1 else g.player2
+                    
+                    winner.profile.wins += 1
+                    winner.profile.rating_elo += 100
+                    winner.profile.save()
+                    
+                    loser.profile.losses += 1
+                    loser.profile.rating_elo = max(0, loser.profile.rating_elo - 100)
+                    loser.profile.save()
+                    
+                    # Обновляем состояние игры
+                    try:
+                        st = GameState.objects.get(game=g)
+                        st.data["phase"] = "FINISHED"
+                        st.data["winner"] = 2 if g.turn == 1 else 1
+                        st.data["win_reason"] = "time"
+                        st.save()
+                    except GameState.DoesNotExist:
+                        pass
+                    
+                    g.save()
+                    
+                    return {
+                        "turn": g.turn,
+                        "finished": True,
+                        "winner": g.winner_id,
+                        "reason": "time"
+                    }
             
-            # Проверяем окончание времени
-            if bank <= 0:
-                g.status = "FINISHED"
-                g.winner_id = g.player2_id if g.turn == 1 else g.player1_id
-                g.win_reason = "time"
-                g.turn_deadline_at = None
-                
-                # Обновляем статистику игроков
-                winner = g.player2 if g.turn == 1 else g.player1
-                loser = g.player1 if g.turn == 1 else g.player2
-                
-                winner.profile.wins += 1
-                winner.profile.rating_elo += 100
-                winner.profile.save()
-                
-                loser.profile.losses += 1
-                loser.profile.rating_elo = max(0, loser.profile.rating_elo - 100)
-                loser.profile.save()
-                
-                # Обновляем состояние игры
-                try:
-                    st = GameState.objects.get(game=g)
-                    st.data["phase"] = "FINISHED"
-                    st.data["winner"] = 2 if g.turn == 1 else 1
-                    st.data["win_reason"] = "time"
-                    st.save()
-                except GameState.DoesNotExist:
-                    pass
-            
-            g.last_tick_at = now
             g.save()
-            
-            # Вычисляем оставшееся время хода
-            turn_left = 0
-            if g.turn_deadline_at:
-                turn_left = max(0, int((g.turn_deadline_at - now).total_seconds()))
             
             return {
                 "turn": g.turn,
                 "turn_left": turn_left,
-                "bank_left": bank // 1000,
-                "finished": g.status == "FINISHED",
-                "winner": g.winner_id if g.winner_id else None,
-                "reason": g.win_reason
+                "bank_left": bank_seconds,
+                "finished": False
             }
         except Game.DoesNotExist:
             return {"error": "game not found"}
