@@ -43,18 +43,37 @@
                   <div class="rules-inner">
                     <h3>Цель игры</h3>
                     <p>Уничтожить две военно-морские базы (ВМБ) противника или все его движущиеся фишки.</p>
+                    
                     <h3>Подготовка</h3>
-                    <p>Поле 15×14, три зоны. Каждый игрок размещает 61 фишку в своей зоне (5×14) за 15 минут.</p>
+                    <p>Поле 15×14 клеток, разделенное на 3 зоны красными линиями. Каждый игрок размещает 61 фишку в своей зоне (5×14) за 15 минут.</p>
+                    
                     <h3>Состав флота</h3>
-                    <p><strong>БДК</strong> (2), <strong>КР</strong> (6), <strong>А</strong> (1), <strong>С</strong> (1), <strong>ТН</strong> (1), <strong>Л</strong> (2), <strong>ЭС</strong> (6), <strong>М</strong> (6), <strong>СМ</strong> (1), <strong>Ф</strong> (6), <strong>ТК</strong> (6), <strong>Т</strong> (6), <strong>ТР</strong> (6), <strong>СТ</strong> (6), <strong>ПЛ</strong> (1), <strong>КРПЛ</strong> (1), <strong>АБ</strong> (1), <strong>ВМБ</strong> (2)</p>
+                    <p><strong>БДК</strong> (2) - ранг 18, <strong>Л</strong> (2) - ранг 17, <strong>А</strong> (1) - ранг 16, <strong>КР</strong> (6) - ранг 15, <strong>Ф</strong> (6) - ранг 14, <strong>ЭС</strong> (6) - ранг 13, <strong>СТ</strong> (6) - ранг 12, <strong>ТР</strong> (6) - ранг 11, <strong>ТК</strong> (6) - ранг 10, <strong>Т</strong> (6) - ранг 9, <strong>ТН</strong> (1) - ранг 8, <strong>С</strong> (1) - ранг 7, <strong>ПЛ</strong> (1) - ранг 6, <strong>КРПЛ</strong> (1) - ранг 5, <strong>М</strong> (6) - ранг 4, <strong>СМ</strong> (1) - ранг 3, <strong>АБ</strong> (1) - ранг 2, <strong>ВМБ</strong> (2) - ранг 1</p>
+                    
                     <h3>Ходы и время</h3>
-                    <p>Игроки ходят по очереди. На ход — 30 сек. Общий банк — 15 мин. Превышение — списание из банка.</p>
+                    <p>Игроки ходят по очереди. На ход — 30 сек. Общий банк — 15 мин. Превышение времени хода списывается из банка.</p>
+                    
+                    <h3>Движение</h3>
+                    <p>Все фишки двигаются на 1 клетку в 4 направления. <strong>ТК</strong> может двигаться на 1-2 клетки. <strong>ВМБ</strong> и <strong>СМ</strong> неподвижны.</p>
+                    
                     <h3>Группы и атаки</h3>
-                    <p>Группа до 3 фишек одного типа. Сила — сумма рейтингов. ПЛ бьет БДК и А; КРПЛ бьет КР.</p>
+                    <p>Группа до 3 фишек одного типа, стоящих рядом. Сила группы — сумма рейтингов. При столкновении сравниваются силы.</p>
+                    
+                    <h3>Специальные правила</h3>
+                    <p><strong>ПЛ</strong> всегда побеждает <strong>БДК</strong> и <strong>А</strong>. <strong>КРПЛ</strong> всегда побеждает <strong>КР</strong>.</p>
+                    
+                    <h3>Носители</h3>
+                    <p><strong>ЭС</strong> переносит <strong>М</strong>, <strong>ТК</strong> переносит <strong>Т</strong>, <strong>А</strong> переносит <strong>С</strong>. При движении носителя переносимые следуют за ним.</p>
+                    
+                    <h3>Специальные атаки</h3>
+                    <p><strong>Торпедная:</strong> ТК+Т стреляют в 7 направлениях до первого препятствия.<br>
+                    <strong>Воздушная:</strong> А+С атакуют 5 клеток вперед.<br>
+                    <strong>Взрывы:</strong> АБ уничтожает все в радиусе 5×5, М взрывается при атаке (кроме ТР), СМ взрывается от любой атаки, ТН взрывается при любом контакте.</p>
+                    
                     <h3>Победа</h3>
-                    <p>Уничтожение 2 ВМБ противника или всех подвижных фишек, либо истечение времени.</p>
+                    <p>Уничтожение 2 ВМБ противника, всех подвижных фишек или истечение времени у противника.</p>
                   </div>
-                                </div>
+                </div>
               </div>
 
               <div id="lobbyContent" class="content-pane" style="display:none;">
@@ -110,6 +129,7 @@
     </div>
   </main>
 
+  <!-- Модальные окна -->
   <div id="profileModal" class="modal-backdrop">
     <div class="modal">
       <div class="exit modal-close" data-target="profileModal">
@@ -219,7 +239,7 @@
     <div class="pause-modal-content">
       <h2>ПАУЗА</h2>
       <div id="pauseTimer" class="pause-timer">0:00</div>
-      <div id="pauseInfo" class="pause-info">Игра приостановлена</div>
+            <div id="pauseInfo" class="pause-info">Игра приостановлена</div>
       <div id="pauseControls" style="display: none;">
         <button id="cancelPauseBtn2" class="menuButs xs">Снять паузу</button>
       </div>

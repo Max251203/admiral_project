@@ -17,7 +17,7 @@ class Game(models.Model):
     
     setup_deadline_at = models.DateTimeField(null=True, blank=True)
     turn_deadline_at = models.DateTimeField(null=True, blank=True)
-    last_tick_at = models.DateTimeField(null=True, blank=True)
+    turn_start_time = models.FloatField(null=True, blank=True)  # Unix timestamp
     
     ready_p1 = models.BooleanField(default=False)
     ready_p2 = models.BooleanField(default=False)

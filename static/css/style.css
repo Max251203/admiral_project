@@ -90,6 +90,8 @@ main{position:relative;height:98%;width:98%;margin:1% auto;background:rgba(0,0,0
 .fleet-item:hover{background:rgba(255,255,255,.1);}
 .fleet-item.selected{background:rgba(255,255,0,.3);border-color:#ffff00;}
 .fleet-item.depleted{opacity:0.3;cursor:not-allowed;}
+.fleet-item.dependent{opacity:0.7;border-style:dashed;}
+.fleet-item.dependent::after{content:'🔗';position:absolute;top:2px;right:2px;font-size:8px;}
 
 .killed-section{grid-column:1 / -1;border:.12vw solid #80e4ff;border-radius:1rem;background:rgba(0,0,0,.3);padding:8px;overflow:hidden;height:100px;position:relative;}
 .killed-table-container{position:absolute;top:8px;left:8px;right:8px;bottom:8px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#80e4ff #222;}
@@ -106,19 +108,27 @@ main{position:relative;height:98%;width:98%;margin:1% auto;background:rgba(0,0,0
 
 .board{position:absolute;display:grid;grid-template-columns:repeat(14,1fr);grid-template-rows:repeat(15,1fr);gap:1px;border:.12vw solid #80e4ff;background:linear-gradient(315deg,#4dff03,#00d0ff);}
 
+/* Поворот поля для игрока 2 */
+.board.player2{transform:rotate(180deg);}
+.board.player2 .piece{transform:rotate(180deg);}
+
 .board .cell{background:rgba(8,70,104,.66);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .2s;position:relative;}
 .board .cell:hover{background:rgba(8,70,104,.8);}
-.board .cell.selected{background:rgba(255,255,0,.5);}
-.board .cell.valid-move{background:rgba(0,255,0,.25);}
-.board .cell.attack-zone{background:rgba(255,0,0,.25);}
+.board .cell.selected{background:rgba(255,255,0,.5);box-shadow:0 0 10px rgba(255,255,0,0.8);}
+.board .cell.valid-move{background:rgba(0,255,0,.25);animation:pulse-green 1.5s infinite;}
+.board .cell.group-candidate{background:rgba(0,255,255,.3);animation:pulse-cyan 1s infinite;}
 .board .cell.my-zone{background:rgba(0,100,255,.18);}
 .board .cell.enemy-zone{background:rgba(255,100,0,.18);}
-.board .cell.group-selected{background:rgba(255,255,0,.4);}
+.board .cell.group-selected{background:rgba(255,255,0,.4);box-shadow:0 0 8px rgba(255,255,0,0.6);}
+.board .cell.torpedo-direction{background:rgba(255,165,0,.4);cursor:crosshair;}
+.board .cell.air-attack-zone{background:rgba(255,0,255,.3);cursor:crosshair;}
 
-.board .piece{position:absolute;inset:4%;display:flex;align-items:center;justify-content:center;font-weight:800;letter-spacing:.5px;font-size:12px;border-radius:4px;color:#fff;}
+.board .piece{position:absolute;inset:4%;display:flex;align-items:center;justify-content:center;font-weight:800;letter-spacing:.5px;font-size:12px;border-radius:4px;color:#fff;transition:all .3s;}
 .board .piece.destroyed::after{content:'✕';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ff0000;font-size:1.5em;font-weight:bold;background:rgba(255,0,0,.2);}
 
-.group-indicator{position:absolute;top:2px;right:2px;width:8px;height:8px;background:#ffff00;border-radius:50%;z-index:5;}
+.group-indicator{position:absolute;top:2px;right:2px;width:8px;height:8px;background:#ffff00;border-radius:50%;z-index:5;animation:pulse-indicator 1s infinite;}
+
+.carrier-link{position:absolute;top:50%;left:50%;width:2px;height:20px;background:rgba(255,255,255,0.5);transform-origin:center top;z-index:3;pointer-events:none;}
 
 .board .cell[data-y="5"]{border-top:3px solid #ff0000;}
 .board .cell[data-y="10"]{border-top:3px solid #ff0000;}
@@ -183,7 +193,6 @@ main{position:relative;height:98%;width:98%;margin:1% auto;background:rgba(0,0,0
 .pause-modal-content{background:rgba(0,0,0,.9);border:.12vw solid #80e4ff;border-radius:1.2rem;padding:2rem;text-align:center;animation:pulse 2s infinite;width:350px;}
 .pause-timer{font-size:3rem;margin:1rem 0;color:#80e4ff;}
 .pause-info{font-size:1.2rem;opacity:.8;margin-bottom:1rem;}
-@keyframes pulse{0%{transform:scale(1);}50%{transform:scale(1.05);}100%{transform:scale(1);}}
 
 .notification{position:fixed;top:2rem;right:2rem;z-index:100;background:rgba(0,0,0,.9);border:.12vw solid #80e4ff;border-radius:1rem;padding:1rem 1.5rem;color:#fff;min-width:300px;max-width:400px;transform:translateX(100%);transition:transform .3s ease;}
 .notification.show{transform:translateX(0);}
@@ -193,12 +202,34 @@ main{position:relative;height:98%;width:98%;margin:1% auto;background:rgba(0,0,0
 .notification-title{font-weight:bold;margin-bottom:.5rem;}
 .notification-message{font-size:.9rem;opacity:.9;}
 
+.hint-message{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.9);border:.12vw solid #80e4ff;border-radius:1rem;padding:1rem 2rem;color:#fff;font-size:1rem;z-index:90;animation:fade-in-out 3s ease-in-out;}
+
+/* Анимации */
+@keyframes pulse{0%{transform:scale(1);}50%{transform:scale(1.05);}100%{transform:scale(1);}}
+@keyframes pulse-green{0%{background:rgba(0,255,0,.25);}50%{background:rgba(0,255,0,.5);}100%{background:rgba(0,255,0,.25);}}
+@keyframes pulse-cyan{0%{background:rgba(0,255,255,.3);}50%{background:rgba(0,255,255,.6);}100%{background:rgba(0,255,255,.3);}}
+@keyframes pulse-indicator{0%{transform:scale(1);opacity:1;}50%{transform:scale(1.3);opacity:0.7;}100%{transform:scale(1);opacity:1;}}
+@keyframes fade-in-out{0%{opacity:0;transform:translateX(-50%) translateY(20px);}20%{opacity:1;transform:translateX(-50%) translateY(0);}80%{opacity:1;transform:translateX(-50%) translateY(0);}100%{opacity:0;transform:translateX(-50%) translateY(20px);}}
+
 @keyframes movePiece{0%{transform:translate(0,0);}100%{transform:translate(var(--move-x),var(--move-y));}}
 .piece-moving{animation:movePiece .5s forwards;}
 
 .pane{width:100%;height:100%;display:none;flex-direction:column;}
 .pane.active{display:flex;}
 
+/* Специальные индикаторы атак */
+.torpedo-arrow{position:absolute;width:20px;height:20px;background:rgba(255,165,0,0.8);clip-path:polygon(0% 50%, 100% 0%, 100% 100%);cursor:pointer;z-index:10;animation:pulse-orange 1s infinite;}
+.air-attack-line{position:absolute;width:100%;height:4px;background:rgba(255,0,255,0.6);cursor:pointer;z-index:10;animation:pulse-magenta 1s infinite;}
+
+@keyframes pulse-orange{0%{opacity:0.6;}50%{opacity:1;}100%{opacity:0.6;}}
+@keyframes pulse-magenta{0%{opacity:0.6;}50%{opacity:1;}100%{opacity:0.6;}}
+
+/* Эффекты взрывов */
+.explosion-effect{position:absolute;width:100%;height:100%;background:radial-gradient(circle,rgba(255,255,0,0.8) 0%,rgba(255,165,0,0.6) 50%,transparent 100%);animation:explosion 0.8s ease-out;pointer-events:none;z-index:20;}
+
+@keyframes explosion{0%{transform:scale(0);opacity:1;}50%{transform:scale(1.2);opacity:0.8;}100%{transform:scale(2);opacity:0;}}
+
+/* Медиа-запросы */
 @media (max-width:1200px){
     #msWrap{width:95%;}
     #menuHead{font-size:9vw;}
@@ -224,4 +255,5 @@ main{position:relative;height:98%;width:98%;margin:1% auto;background:rgba(0,0,0
     .gameContent{grid-template-columns:1fr;grid-template-rows:50px auto 1fr auto;gap:4px;}
     .side-panel{flex-direction:row;height:auto;}
     .killed-section{height:80px;}
+    .board.player2{transform:none;} /* Отключаем поворот на мобильных */
 }

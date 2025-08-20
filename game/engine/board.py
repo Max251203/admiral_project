@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field, asdict
 from typing import Dict, Tuple, List, Optional, Set
 from .rules import *
+import random
 
 Coord = Tuple[int, int]
 
@@ -9,6 +10,7 @@ class Piece:
     owner: int
     kind: str
     alive: bool = True
+    visible_to: Set[int] = field(default_factory=set)
 
 @dataclass
 class GameData:
@@ -19,6 +21,8 @@ class GameData:
     win_reason: str = ""
     setup_counts: Dict[int, Dict[str, int]] = field(default_factory=lambda: {1: {}, 2: {}})
     last_move: Optional[Dict] = None
+    turn_start_time: Optional[float] = None
+    bank_time_used: Dict[int, float] = field(default_factory=lambda: {1: 0.0, 2: 0.0})
 
 class Engine:
     def __init__(self, data: dict = None):
@@ -27,7 +31,13 @@ class Engine:
             for k, v in data.get("board", {}).items():
                 if isinstance(k, str) and "," in k:
                     x, y = map(int, k.split(","))
-                    board[(x, y)] = Piece(**v) if isinstance(v, dict) else Piece(owner=v.get("owner", 1), kind=v.get("kind", "ST"))
+                    visible_to = set(v.get("visible_to", []))
+                    board[(x, y)] = Piece(
+                        owner=v.get("owner", 1), 
+                        kind=v.get("kind", "ST"),
+                        alive=v.get("alive", True),
+                        visible_to=visible_to
+                    )
                 
             self.gd = GameData(
                 turn=data.get("turn", 1),
@@ -36,12 +46,23 @@ class Engine:
                 winner=data.get("winner"),
                 win_reason=data.get("win_reason", ""),
                 setup_counts=data.get("setup_counts", {1: {}, 2: {}}),
-                last_move=data.get("last_move")
+                last_move=data.get("last_move"),
+                turn_start_time=data.get("turn_start_time"),
+                bank_time_used=data.get("bank_time_used", {1: 0.0, 2: 0.0})
             )
         else:
             self.gd = GameData()
 
     def to_json(self) -> dict:
+        board_data = {}
+        for (x, y), piece in self.gd.board.items():
+            board_data[f"{x},{y}"] = {
+                "owner": piece.owner,
+                "kind": piece.kind,
+                "alive": piece.alive,
+                "visible_to": list(piece.visible_to)
+            }
+        
         return {
             "turn": self.gd.turn,
             "phase": self.gd.phase,
@@ -49,9 +70,9 @@ class Engine:
             "win_reason": self.gd.win_reason,
             "setup_counts": self.gd.setup_counts,
             "last_move": self.gd.last_move,
-            "board": {
-                f"{x},{y}": asdict(piece) for (x, y), piece in self.gd.board.items()
-            }
+            "turn_start_time": self.gd.turn_start_time,
+            "bank_time_used": self.gd.bank_time_used,
+            "board": board_data
         }
 
     def _in_bounds(self, coord: Coord) -> bool:
@@ -116,6 +137,7 @@ class Engine:
         if not attacker_piece or not defender_piece:
             return "invalid"
 
+        # Специальные правила уничтожения
         if len(attacker_coords) == 1 and len(defender_coords) == 1:
             if is_special_kill(attacker_piece.kind, defender_piece.kind):
                 return "attacker_wins"
@@ -145,6 +167,7 @@ class Engine:
         destroyed = []
         cx, cy = center
         
+        # Взрыв 5x5 вокруг центра
         for dy in range(-2, 3):
             for dx in range(-2, 3):
                 coord = (cx + dx, cy + dy)
@@ -152,6 +175,7 @@ class Engine:
                     piece = self._get_piece(coord)
                     if piece:
                         destroyed.append(piece.kind)
+                        # Цепная реакция АБ
                         if piece.kind == "AB" and coord != center:
                             destroyed.extend(self._explode_ab(coord))
                         self._set_piece(coord, None)
@@ -187,6 +211,32 @@ class Engine:
         if self.gd.phase in ("TURN_P1", "TURN_P2"):
             self.gd.phase = f"TURN_P{self.gd.turn}"
 
+    def _make_pieces_visible(self, coords: List[Coord], to_player: int):
+        """Делает фишки видимыми для указанного игрока"""
+        for coord in coords:
+            piece = self._get_piece(coord)
+            if piece:
+                piece.visible_to.add(to_player)
+
+    def _move_carried_pieces(self, carrier_coord: Coord, new_carrier_coord: Coord, carried_type: str, owner: int):
+        """Перемещает переносимые фишки вслед за носителем"""
+        # Находим все переносимые фишки рядом со старой позицией
+        carried_pieces = []
+        for adj_coord in self._get_adjacent_coords(carrier_coord):
+            piece = self._get_piece(adj_coord)
+            if piece and piece.owner == owner and piece.kind == carried_type:
+                carried_pieces.append(adj_coord)
+        
+        # Перемещаем их к новой позиции носителя
+        new_positions = self._get_adjacent_coords(new_carrier_coord)
+        for i, old_coord in enumerate(carried_pieces):
+            if i < len(new_positions):
+                new_coord = new_positions[i]
+                if not self._get_piece(new_coord):  # Если клетка свободна
+                    piece = self._get_piece(old_coord)
+                    self._set_piece(old_coord, None)
+                    self._set_piece(new_coord, piece)
+
     def place_ship(self, owner: int, coord: Coord, ship_type: str):
         if self.gd.phase != "SETUP":
             raise ValueError("Not in setup phase")
@@ -209,7 +259,9 @@ class Engine:
         if current_count >= max_count:
             raise ValueError(f"Maximum {ship_type} ships already placed")
         
-        self._set_piece(coord, Piece(owner=owner, kind=ship_type))
+        piece = Piece(owner=owner, kind=ship_type)
+        piece.visible_to.add(owner)  # Игрок всегда видит свои фишки
+        self._set_piece(coord, piece)
         self.gd.setup_counts[owner][ship_type] = current_count + 1
 
     def move_piece(self, owner: int, src: Coord, dst: Coord, followers: List[Tuple[Coord, Coord]] = None) -> dict:
@@ -229,6 +281,7 @@ class Engine:
         if is_immobile(piece.kind):
             raise ValueError("Piece cannot move")
         
+        # Проверка дистанции
         dx, dy = dst[0] - src[0], dst[1] - src[1]
         distance = abs(dx) + abs(dy)
         
@@ -246,11 +299,22 @@ class Engine:
             if target_piece.owner == owner:
                 raise ValueError("Cannot move to occupied friendly cell")
             
+            # Столкновение - делаем фишки видимыми друг для друга
+            self._make_pieces_visible([src], 3 - owner)
+            self._make_pieces_visible([dst], owner)
+            
             result.update(self._handle_combat(src, dst))
         else:
+            # Обычное перемещение
             self._set_piece(dst, piece)
             self._set_piece(src, None)
             
+            # Перемещение переносимых фишек
+            carried_type = can_carry(piece.kind)
+            if carried_type:
+                self._move_carried_pieces(src, dst, carried_type, owner)
+            
+            # Обработка followers (для групп)
             if followers:
                 self._move_followers(dst, followers, owner)
         
@@ -267,6 +331,7 @@ class Engine:
         
         result = {"event": "combat", "captures": [], "destroyed_own": []}
         
+        # Взрыв атомной бомбы
         if attacker_piece.kind == "AB" or defender_piece.kind == "AB":
             explosion_center = defender_coord if defender_piece.kind == "AB" else attacker_coord
             destroyed = self._explode_ab(explosion_center)
@@ -274,6 +339,7 @@ class Engine:
             result["captures"] = destroyed
             return result
         
+        # Взрыв танкера
         if defender_piece.kind == "TN" or attacker_piece.kind == "TN":
             result["event"] = "tanker_explosion"
             result["captures"] = [defender_piece.kind]
@@ -282,6 +348,7 @@ class Engine:
             self._set_piece(defender_coord, None)
             return result
         
+        # Мина
         if defender_piece.kind == "M":
             if attacker_piece.kind == "TR":
                 result["event"] = "mine_cleared"
@@ -294,14 +361,20 @@ class Engine:
                 self._set_piece(attacker_coord, None)
                 return result
         
+        # Стационарная мина
         if defender_piece.kind == "SM":
             result["event"] = "static_mine_explosion"
             result["destroyed_own"] = [attacker_piece.kind]
             self._set_piece(attacker_coord, None)
             return result
         
+        # Обычный бой
         attacker_group = self._find_group(attacker_coord, attacker_piece.kind, attacker_piece.owner)
         defender_group = self._find_group(defender_coord, defender_piece.kind, defender_piece.owner)
+        
+        # Делаем группы видимыми
+        self._make_pieces_visible(attacker_group, 3 - attacker_piece.owner)
+        self._make_pieces_visible(defender_group, attacker_piece.owner)
         
         combat_result = self._resolve_combat(attacker_group, defender_group)
         
@@ -365,6 +438,7 @@ class Engine:
         if abs(dx) + abs(dy) != 1:
             raise ValueError("Invalid direction")
         
+        # Нельзя стрелять назад
         back_direction = (tk_coord[0] - torpedo_coord[0], tk_coord[1] - torpedo_coord[1])
         if (dx, dy) == back_direction:
             raise ValueError("Cannot shoot backwards")
@@ -382,6 +456,8 @@ class Engine:
             
             piece = self._get_piece(coord)
             if piece:
+                # Делаем цель видимой
+                self._make_pieces_visible([coord], owner)
                 result["captures"].append(piece.kind)
                 self._set_piece(coord, None)
                 break
@@ -411,6 +487,7 @@ class Engine:
         if carrier.kind != "A" or plane.kind != "S":
             raise ValueError("Wrong piece types")
         
+        # Самолет должен быть впереди авианосца
         direction = 1 if owner == 2 else -1
         expected_plane_pos = (carrier_coord[0], carrier_coord[1] + direction)
         
@@ -429,6 +506,8 @@ class Engine:
             
             piece = self._get_piece(coord)
             if piece:
+                # Делаем цель видимой
+                self._make_pieces_visible([coord], owner)
                 result["captures"].append(piece.kind)
                 self._set_piece(coord, None)
         
@@ -464,11 +543,11 @@ class Engine:
         return result
 
     def auto_setup(self, owner: int) -> int:
-        import random
-        
+        """Логичная авторасстановка"""
         if self.gd.phase != "SETUP":
             raise ValueError("Not in setup phase")
         
+        # Очищаем старую расстановку
         for coord in list(self.gd.board.keys()):
             piece = self.gd.board[coord]
             if piece.owner == owner:
@@ -480,21 +559,99 @@ class Engine:
         
         rows = list(range(10, 15)) if owner == 1 else list(range(0, 5))
         cols = list(range(0, 14))
-        available_cells = [(x, y) for y in rows for x in cols]
-        random.shuffle(available_cells)
         
         placed_count = 0
+        used_positions = set()
         
-        for ship_type, ship_data in SHIP_TYPES.items():
-            count = ship_data["count"]
+        def place_ship_at(x, y, ship_type):
+            nonlocal placed_count
+            if (x, y) not in used_positions and 0 <= x < 14 and y in rows:
+                try:
+                    self.place_ship(owner, (x, y), ship_type)
+                    used_positions.add((x, y))
+                    placed_count += 1
+                    return True
+                except ValueError:
+                    pass
+            return False
+        
+        # 1. Размещаем ВМБ в углах
+        vmb_positions = [(0, rows[0]), (13, rows[0]), (0, rows[-1]), (13, rows[-1])]
+        for i, pos in enumerate(vmb_positions[:2]):
+            place_ship_at(pos[0], pos[1], "VMB")
+        
+        # 2. Размещаем АБ и СМ в защищенных позициях
+        protected_positions = [(6, rows[1]), (7, rows[1])]
+        place_ship_at(protected_positions[0][0], protected_positions[0][1], "AB")
+        place_ship_at(protected_positions[1][0], protected_positions[1][1], "SM")
+        
+        # 3. Размещаем носители с переносимыми фишками
+        # ЭС + М
+        es_positions = [(2, rows[2]), (4, rows[2]), (6, rows[2]), (8, rows[2]), (10, rows[2]), (12, rows[2])]
+        for i, pos in enumerate(es_positions):
+            if place_ship_at(pos[0], pos[1], "ES"):
+                # Размещаем мину рядом
+                for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+                    if place_ship_at(pos[0] + dx, pos[1] + dy, "M"):
+                        break
+        
+        # ТК + Т
+        tk_positions = [(1, rows[3]), (3, rows[3]), (5, rows[3]), (7, rows[3]), (9, rows[3]), (11, rows[3])]
+        for i, pos in enumerate(tk_positions):
+            if place_ship_at(pos[0], pos[1], "TK"):
+                # Размещаем торпеду рядом
+                for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+                    if place_ship_at(pos[0] + dx, pos[1] + dy, "T"):
+                        break
+        
+        # А + С
+        a_pos = (6, rows[3])
+        if place_ship_at(a_pos[0], a_pos[1], "A"):
+            # Самолет впереди авианосца
+            s_y = a_pos[1] + (1 if owner == 2 else -1)
+            if s_y in rows:
+                place_ship_at(a_pos[0], s_y, "S")
+        
+        # 4. Размещаем группы однотипных кораблей
+        group_ships = ["BDK", "L", "KR", "F", "ST", "TR"]
+        available_positions = [(x, y) for x in cols for y in rows if (x, y) not in used_positions]
+        random.shuffle(available_positions)
+        
+        pos_idx = 0
+        for ship_type in group_ships:
+            count = SHIP_TYPES[ship_type]["count"]
+            # Размещаем группами по 2-3 корабля рядом
+            groups = []
+            for i in range(0, count, 3):
+                group_size = min(3, count - i)
+                groups.append(group_size)
+            
+            for group_size in groups:
+                if pos_idx < len(available_positions):
+                    start_pos = available_positions[pos_idx]
+                    placed_in_group = 0
+                    
+                    # Пытаемся разместить группу компактно
+                    for dx in range(-1, 2):
+                        for dy in range(-1, 2):
+                            if placed_in_group >= group_size:
+                                break
+                            x, y = start_pos[0] + dx, start_pos[1] + dy
+                            if place_ship_at(x, y, ship_type):
+                                placed_in_group += 1
+                        if placed_in_group >= group_size:
+                            break
+                    
+                    pos_idx += 10  # Пропускаем позиции для следующей группы
+        
+        # 5. Размещаем оставшиеся фишки
+        remaining_ships = ["PL", "KRPL", "TN"]
+        for ship_type in remaining_ships:
+            count = SHIP_TYPES[ship_type]["count"]
             for _ in range(count):
-                if available_cells:
-                    coord = available_cells.pop()
-                    try:
-                        self.place_ship(owner, coord, ship_type)
-                        placed_count += 1
-                    except ValueError:
-                        continue
+                for x, y in available_positions:
+                    if place_ship_at(x, y, ship_type):
+                        break
         
         return placed_count
 
@@ -512,3 +669,96 @@ class Engine:
         
         if owner in self.gd.setup_counts:
             self.gd.setup_counts[owner] = {}
+
+    def get_visible_board_for_player(self, player: int) -> dict:
+        """Возвращает доску с фишками, видимыми для указанного игрока"""
+        visible_board = {}
+        for coord, piece in self.gd.board.items():
+            if player in piece.visible_to:
+                coord_str = f"{coord[0]},{coord[1]}"
+                visible_board[coord_str] = {
+                    "owner": piece.owner,
+                    "kind": piece.kind,
+                    "alive": piece.alive
+                }
+        return visible_board
+
+    def get_group_candidates(self, coord: Coord, owner: int) -> List[Coord]:
+        """Возвращает список координат фишек, которые могут быть добавлены в группу"""
+        piece = self._get_piece(coord)
+        if not piece or piece.owner != owner:
+            return []
+        
+        candidates = []
+        for adj_coord in self._get_adjacent_coords(coord):
+            adj_piece = self._get_piece(adj_coord)
+            if (adj_piece and adj_piece.owner == owner and 
+                adj_piece.kind == piece.kind and adj_piece.alive):
+                candidates.append(adj_coord)
+        
+        return candidates[:2]  # Максимум 2 дополнительные фишки (всего 3 в группе)
+
+    def get_special_attack_options(self, owner: int) -> dict:
+        """Возвращает доступные специальные атаки"""
+        options = {
+            "torpedo": [],
+            "air": []
+        }
+        
+        for coord, piece in self.gd.board.items():
+            if piece.owner != owner or not piece.alive:
+                continue
+            
+            # Торпедная атака
+            if piece.kind == "TK":
+                for adj_coord in self._get_adjacent_coords(coord):
+                    adj_piece = self._get_piece(adj_coord)
+                    if (adj_piece and adj_piece.owner == owner and 
+                        adj_piece.kind == "T" and adj_piece.alive):
+                        # Определяем возможные направления стрельбы
+                        directions = []
+                        for dx, dy in [(1,0), (-1,0), (0,1), (0,-1), (1,1), (-1,-1), (1,-1), (-1,1)]:
+                            # Проверяем, что направление не назад от торпеды к ТК
+                            torpedo_to_tk = (coord[0] - adj_coord[0], coord[1] - adj_coord[1])
+                            if (dx, dy) != torpedo_to_tk:
+                                directions.append((dx, dy))
+                        
+                        options["torpedo"].append({
+                            "tk": coord,
+                            "torpedo": adj_coord,
+                            "directions": directions
+                        })
+            
+            # Воздушная атака
+            elif piece.kind == "A":
+                direction = 1 if owner == 2 else -1
+                plane_coord = (coord[0], coord[1] + direction)
+                plane_piece = self._get_piece(plane_coord)
+                if (plane_piece and plane_piece.owner == owner and 
+                    plane_piece.kind == "S" and plane_piece.alive):
+                    options["air"].append({
+                        "carrier": coord,
+                        "plane": plane_coord,
+                        "direction": direction
+                    })
+        
+        return options
+
+    def get_carried_pieces(self, carrier_coord: Coord) -> List[Coord]:
+        """Возвращает список переносимых фишек для данного носителя"""
+        carrier_piece = self._get_piece(carrier_coord)
+        if not carrier_piece:
+            return []
+        
+        carried_type = can_carry(carrier_piece.kind)
+        if not carried_type:
+            return []
+        
+        carried = []
+        for adj_coord in self._get_adjacent_coords(carrier_coord):
+            adj_piece = self._get_piece(adj_coord)
+            if (adj_piece and adj_piece.owner == carrier_piece.owner and 
+                adj_piece.kind == carried_type and adj_piece.alive):
+                carried.append(adj_coord)
+        
+        return carried

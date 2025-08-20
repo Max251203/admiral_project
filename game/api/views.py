@@ -1,4 +1,5 @@
 import random
+import time
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.db import models
@@ -25,11 +26,14 @@ def _persist_after_engine(game: Game, st: GameState, eng: Engine):
     game.turn = eng.gd.turn
     if eng.gd.phase in ("TURN_P1", "TURN_P2"):
         game.status = eng.gd.phase
+        # Сбрасываем время начала хода при смене хода
+        game.turn_start_time = time.time()
     elif eng.gd.phase == "SETUP":
         game.status = "SETUP"
     elif eng.gd.phase == "FINISHED":
         game.status = "FINISHED"
-    game.save(update_fields=["turn", "status"])
+        game.turn_start_time = None
+    game.save(update_fields=["turn", "status", "turn_start_time"])
 
 class GetState(APIView):
     permission_classes = [IsAuthenticated]
@@ -40,12 +44,21 @@ class GetState(APIView):
             return Response({"error": "not your game"}, status=403)
         
         st = _ensure_state(g)
+        eng = Engine(st.data)
+        my_player = _actor(g, request.user)
+        
+        # Возвращаем только видимые для игрока фишки
+        visible_board = eng.get_visible_board_for_player(my_player)
+        
         return Response({
             "game": str(g.id),
-            "state": st.data,
+            "state": {
+                **st.data,
+                                "board": visible_board
+            },
             "status": g.status,
             "turn": g.turn,
-            "my_player": _actor(g, request.user)
+            "my_player": my_player
         })
 
 class SetupAPI(APIView):
@@ -74,7 +87,10 @@ class SetupAPI(APIView):
                 type="setup",
                 payload={"count": len(request.data.get("placements", []))}
             )
-            return Response({"ok": True, "state": st.data})
+            
+            # Возвращаем только видимые фишки
+            visible_board = eng.get_visible_board_for_player(me)
+            return Response({"ok": True, "state": {**st.data, "board": visible_board}})
         except ValueError as e:
             return Response({"error": str(e)}, status=400)
 
@@ -106,7 +122,9 @@ class ClearSetup(APIView):
             type="setup_clear",
             payload={}
         )
-        return Response({"ok": True, "state": st.data})
+        
+        visible_board = eng.get_visible_board_for_player(me)
+        return Response({"ok": True, "state": {**st.data, "board": visible_board}})
 
 class SubmitSetup(APIView):
     permission_classes = [IsAuthenticated]
@@ -137,7 +155,7 @@ class SubmitSetup(APIView):
                 g.status = "TURN_P2"
                 g.turn = 2
             
-            g.turn_deadline_at = now + timezone.timedelta(seconds=30)
+            g.turn_start_time = time.time()
             st.data["phase"] = g.status
             st.data["turn"] = g.turn
             g.save()
@@ -168,7 +186,9 @@ class AutoSetup(APIView):
                 type="auto_setup",
                 payload={"count": placed}
             )
-            return Response({"ok": True, "state": st.data, "placed": placed})
+            
+            visible_board = eng.get_visible_board_for_player(me)
+            return Response({"ok": True, "state": {**st.data, "board": visible_board}, "placed": placed})
         except ValueError as e:
             return Response({"error": str(e)}, status=400)
 
@@ -195,7 +215,6 @@ class MoveAPI(APIView):
             
             result = eng.move_piece(me, src, dst, followers)
             
-            g.turn_deadline_at = timezone.now() + timezone.timedelta(seconds=30)
             _persist_after_engine(g, st, eng)
             
             if "captures" in result and result["captures"]:
@@ -217,7 +236,7 @@ class MoveAPI(APIView):
                 g.status = "FINISHED"
                 g.winner_id = g.player1_id if st.data["winner"] == 1 else g.player2_id
                 g.win_reason = st.data.get("win_reason", "")
-                g.turn_deadline_at = None
+                g.turn_start_time = None
                 g.save()
                 
                 if g.winner_id:
@@ -230,7 +249,8 @@ class MoveAPI(APIView):
                     loser.profile.rating_elo = max(0, loser.profile.rating_elo - 100)
                     loser.profile.save()
             
-            return Response({"ok": True, "result": result, "state": st.data})
+            visible_board = eng.get_visible_board_for_player(me)
+            return Response({"ok": True, "result": result, "state": {**st.data, "board": visible_board}})
         except ValueError as e:
             return Response({"error": str(e)}, status=400)
 
@@ -253,7 +273,6 @@ class TorpedoAPI(APIView):
             
             result = eng.torpedo_attack(me, torpedo_coord, tk_coord, direction)
             
-            g.turn_deadline_at = timezone.now() + timezone.timedelta(seconds=30)
             _persist_after_engine(g, st, eng)
             
             if "captures" in result and result["captures"]:
@@ -275,7 +294,7 @@ class TorpedoAPI(APIView):
                 g.status = "FINISHED"
                 g.winner_id = g.player1_id if st.data["winner"] == 1 else g.player2_id
                 g.win_reason = st.data.get("win_reason", "")
-                g.turn_deadline_at = None
+                g.turn_start_time = None
                 g.save()
                 
                 if g.winner_id:
@@ -288,7 +307,8 @@ class TorpedoAPI(APIView):
                     loser.profile.rating_elo = max(0, loser.profile.rating_elo - 100)
                     loser.profile.save()
             
-            return Response({"ok": True, "result": result, "state": st.data})
+            visible_board = eng.get_visible_board_for_player(me)
+            return Response({"ok": True, "result": result, "state": {**st.data, "board": visible_board}})
         except ValueError as e:
             return Response({"error": str(e)}, status=400)
 
@@ -310,7 +330,6 @@ class AirAPI(APIView):
             
             result = eng.air_attack(me, carrier_coord, plane_coord)
             
-            g.turn_deadline_at = timezone.now() + timezone.timedelta(seconds=30)
             _persist_after_engine(g, st, eng)
             
             if "captures" in result and result["captures"]:
@@ -332,7 +351,7 @@ class AirAPI(APIView):
                 g.status = "FINISHED"
                 g.winner_id = g.player1_id if st.data["winner"] == 1 else g.player2_id
                 g.win_reason = st.data.get("win_reason", "")
-                g.turn_deadline_at = None
+                g.turn_start_time = None
                 g.save()
                 
                 if g.winner_id:
@@ -345,7 +364,8 @@ class AirAPI(APIView):
                     loser.profile.rating_elo = max(0, loser.profile.rating_elo - 100)
                     loser.profile.save()
             
-            return Response({"ok": True, "result": result, "state": st.data})
+            visible_board = eng.get_visible_board_for_player(me)
+            return Response({"ok": True, "result": result, "state": {**st.data, "board": visible_board}})
         except ValueError as e:
             return Response({"error": str(e)}, status=400)
 
@@ -355,7 +375,7 @@ class BombAPI(APIView):
     def post(self, request, game_id):
         g = get_object_or_404(Game, id=game_id)
         if g.player1_id != request.user.id and g.player2_id != request.user.id:
-                        return Response({"error": "not your game"}, status=403)
+            return Response({"error": "not your game"}, status=403)
         
         st = _ensure_state(g)
         eng = Engine(st.data)
@@ -366,7 +386,6 @@ class BombAPI(APIView):
             
             result = eng.detonate_bomb(me, bomb_coord)
             
-            g.turn_deadline_at = timezone.now() + timezone.timedelta(seconds=30)
             _persist_after_engine(g, st, eng)
             
             if "captures" in result and result["captures"]:
@@ -388,7 +407,7 @@ class BombAPI(APIView):
                 g.status = "FINISHED"
                 g.winner_id = g.player1_id if st.data["winner"] == 1 else g.player2_id
                 g.win_reason = st.data.get("win_reason", "")
-                g.turn_deadline_at = None
+                g.turn_start_time = None
                 g.save()
                 
                 if g.winner_id:
@@ -401,7 +420,8 @@ class BombAPI(APIView):
                     loser.profile.rating_elo = max(0, loser.profile.rating_elo - 100)
                     loser.profile.save()
             
-            return Response({"ok": True, "result": result, "state": st.data})
+            visible_board = eng.get_visible_board_for_player(me)
+            return Response({"ok": True, "result": result, "state": {**st.data, "board": visible_board}})
         except ValueError as e:
             return Response({"error": str(e)}, status=400)
 
@@ -485,7 +505,7 @@ class ResignAPI(APIView):
         g.status = "FINISHED"
         g.winner_id = g.player2_id if me == 1 else g.player1_id
         g.win_reason = "resign"
-        g.turn_deadline_at = None
+        g.turn_start_time = None
         g.save()
         
         st.data = eng.to_json()
@@ -508,7 +528,8 @@ class ResignAPI(APIView):
         loser.profile.rating_elo = max(0, loser.profile.rating_elo - 100)
         loser.profile.save()
         
-        return Response({"ok": True, "state": st.data})
+        visible_board = eng.get_visible_board_for_player(me)
+        return Response({"ok": True, "state": {**st.data, "board": visible_board}})
 
 class GameByCode(APIView):
     permission_classes = [IsAuthenticated]
@@ -519,10 +540,14 @@ class GameByCode(APIView):
             return Response({"error": "not your game"}, status=403)
         
         st = _ensure_state(g)
+        eng = Engine(st.data)
+        me = _actor(g, request.user)
+        visible_board = eng.get_visible_board_for_player(me)
+        
         return Response({
             "id": str(g.id),
-            "state": st.data,
-            "my_player": _actor(g, request.user)
+            "state": {**st.data, "board": visible_board},
+            "my_player": me
         })
 
 class MyGames(APIView):
@@ -566,6 +591,7 @@ class GameTimers(APIView):
             return Response({"error": "not your game"}, status=403)
         
         now = timezone.now()
+        current_time = time.time()
         me = _actor(g, request.user)
         
         pauses_info = {
@@ -587,7 +613,7 @@ class GameTimers(APIView):
             if now >= g.pause_until:
                 g.status = f"TURN_P{g.turn}"
                 g.pause_until = None
-                g.turn_deadline_at = now + timezone.timedelta(seconds=30)
+                # НЕ сбрасываем turn_start_time
                 g.save()
             else:
                 pause_left = int((g.pause_until - now).total_seconds())
@@ -609,53 +635,20 @@ class GameTimers(APIView):
                 **pauses_info
             })
         
-        turn_left = 0
-        if g.turn_deadline_at:
-            turn_left = max(0, int((g.turn_deadline_at - now).total_seconds()))
-            if turn_left == 0:
-                bank_attr = "bank_ms_p1" if g.turn == 1 else "bank_ms_p2"
-                bank = getattr(g, bank_attr)
-                overflow = max(0, (now - g.turn_deadline_at).total_seconds())
-                bank = max(0, bank - int(overflow * 1000))
-                setattr(g, bank_attr, bank)
-                
-                if bank <= 0:
-                    g.status = "FINISHED"
-                    g.winner_id = g.player2_id if g.turn == 1 else g.player1_id
-                    g.win_reason = "time"
-                    g.turn_deadline_at = None
-                    g.save()
-                    
-                    st = _ensure_state(g)
-                    st.data["phase"] = "FINISHED"
-                    st.data["winner"] = 2 if g.turn == 1 else 1
-                    st.data["win_reason"] = "time"
-                    st.save()
-                    
-                    winner = g.player2 if g.turn == 1 else g.player1
-                    loser = g.player1 if g.turn == 1 else g.player2
-                    winner.profile.wins += 1
-                    winner.profile.rating_elo += 100
-                    winner.profile.save()
-                    loser.profile.losses += 1
-                    loser.profile.rating_elo = max(0, loser.profile.rating_elo - 100)
-                    loser.profile.save()
-                    
-                    return Response({
-                        "turn": g.turn,
-                        "finished": True,
-                        "winner_player": 2 if g.turn == 1 else 1,
-                        "reason": "time",
-                        **pauses_info
-                    })
+        # Вычисляем время хода и банк
+        turn_left = 30
+        if g.turn_start_time:
+            turn_elapsed = current_time - g.turn_start_time
+            turn_left = max(0, 30 - int(turn_elapsed))
         
         bank_attr = "bank_ms_p1" if g.turn == 1 else "bank_ms_p2"
-        bank = getattr(g, bank_attr)
+        bank_ms = getattr(g, bank_attr)
+        bank_left = bank_ms // 1000
         
         return Response({
             "turn": g.turn,
             "turn_left": turn_left,
-            "bank_left": bank // 1000,
+            "bank_left": bank_left,
             **pauses_info
         })
 
@@ -675,7 +668,7 @@ class CancelPauseAPI(APIView):
         
         g.status = f"TURN_P{g.turn}"
         g.pause_until = None
-        g.turn_deadline_at = timezone.now() + timezone.timedelta(seconds=30)
+        # НЕ сбрасываем turn_start_time
         g.save()
         
         Move.objects.create(
@@ -703,3 +696,52 @@ class KilledPieces(APIView):
         items = [{"piece": k.piece, "killed": k.killed} for k in killed]
         
         return Response({"items": items})
+
+class GetGroupCandidates(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, game_id):
+        g = get_object_or_404(Game, id=game_id)
+        if g.player1_id != request.user.id and g.player2_id != request.user.id:
+            return Response({"error": "not your game"}, status=403)
+        
+        st = _ensure_state(g)
+        eng = Engine(st.data)
+        me = _actor(g, request.user)
+        
+        coord = tuple(request.data["coord"])
+        candidates = eng.get_group_candidates(coord, me)
+        
+        return Response({"candidates": candidates})
+
+class GetSpecialAttacks(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, game_id):
+        g = get_object_or_404(Game, id=game_id)
+        if g.player1_id != request.user.id and g.player2_id != request.user.id:
+            return Response({"error": "not your game"}, status=403)
+        
+        st = _ensure_state(g)
+        eng = Engine(st.data)
+        me = _actor(g, request.user)
+        
+        options = eng.get_special_attack_options(me)
+        
+        return Response({"options": options})
+
+class GetCarriedPieces(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, game_id):
+        g = get_object_or_404(Game, id=game_id)
+        if g.player1_id != request.user.id and g.player2_id != request.user.id:
+            return Response({"error": "not your game"}, status=403)
+        
+        st = _ensure_state(g)
+        eng = Engine(st.data)
+        
+        coord = tuple(request.data["coord"])
+        carried = eng.get_carried_pieces(coord)
+        
+        return Response({"carried": carried})
