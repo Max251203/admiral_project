@@ -56,10 +56,10 @@ const App = {
     pendingAttack: null, moveMode: 'normal', setupSubmitted: false,
     turnStartTime: null, bankTimeUsed: 0, selectedShip: null,
     groupCandidates: [], specialAttacks: null, carriedPieces: [],
-    moveSelectionActive: false,
-    myTurnLeft: 30,
-    myBankLeft: 900,
-    opponentBankLeft: 900
+    moveSelectionActive: false, selectionLocked: false,
+    myTurnLeft: 30, myBankLeft: 900, opponentBankLeft: 900,
+    lastRenderTime: 0, isMyTurn: false, gameFinished: false,
+    pauseActive: false, pollingStopped: false
   }
 };
 
@@ -129,12 +129,13 @@ function clearAllHighlights() {
   });
   document.querySelectorAll('.group-indicator').forEach(ind => ind.remove());
   App.game.moveSelectionActive = false;
+  App.game.selectionLocked = false;
 }
 
 function showMenu(){
   clearAllHighlights();
   msContainer.classList.remove('flip');
-  if(App.game.pollTimer){ clearInterval(App.game.pollTimer); App.game.pollTimer = null; }
+  stopGamePolling();
   if(App.game.setupTimer){ clearInterval(App.game.setupTimer); App.game.setupTimer = null; }
 }
 
@@ -198,15 +199,20 @@ function handleCellClick(e) {
   const cell = e.currentTarget;
   const x = parseInt(cell.dataset.x), y = parseInt(cell.dataset.y);
   
-  if(pauseModalOverlay && pauseModalOverlay.style.display === 'flex') {
+  if(App.game.pauseActive) {
     showNotification('Игра на паузе', 'Дождитесь окончания паузы', 'warning');
+    return;
+  }
+  
+  if(App.game.gameFinished) {
+    showNotification('Игра завершена', 'Игра уже закончена', 'info');
     return;
   }
   
   if(App.game.setupPhase) {
     handleSetupClick(x, y, cell);
   } else {
-    if(App.game.state && App.game.state.turn !== App.game.myPlayer) {
+    if(!App.game.isMyTurn) {
       showNotification('Ошибка', 'Сейчас не ваш ход', 'error');
       return;
     }
@@ -230,6 +236,9 @@ function handleSetupClick(x, y, cell) {
 async function handleGameClick(x, y, cell) {
   const piece = cell.querySelector('.piece');
   
+  if(App.game.selectionLocked) return;
+  
+  // Обработка специальных атак
   if(cell.classList.contains('torpedo-direction')) {
     await executeTorpedoAttack(x, y);
     return;
@@ -240,38 +249,46 @@ async function handleGameClick(x, y, cell) {
     return;
   }
   
+  // Если режим выбора активен
   if(App.game.moveSelectionActive) {
+    // Клик на ту же фишку - отмена
     if(App.game.selectedPiece && App.game.selectedPiece.x === x && App.game.selectedPiece.y === y) {
       clearSelection();
       showHint('Выбор отменен');
       return;
     }
     
+    // Клик на валидный ход
     if(cell.classList.contains('valid-move')) {
-      if(App.game.selectedPiece) {
-        await movePiece(App.game.selectedPiece.x, App.game.selectedPiece.y, x, y);
-      } else if(App.game.selectedGroup.length > 0) {
+      App.game.selectionLocked = true;
+      if(App.game.selectedGroup.length > 0) {
         await moveGroup(x, y);
+      } else if(App.game.selectedPiece) {
+        await movePiece(App.game.selectedPiece.x, App.game.selectedPiece.y, x, y);
       }
       return;
     }
     
+    // Клик на кандидата в группу
     if(cell.classList.contains('group-candidate')) {
       await addToGroup(x, y);
       return;
     }
     
+    // Клик на другую свою фишку - переключение выбора
     if(piece && parseInt(piece.dataset.owner) === App.game.myPlayer) {
       clearSelectionVisuals();
       await selectPiece(x, y, piece);
       return;
     }
     
+    // Клик на пустую клетку или чужую фишку - отмена
     clearSelection();
     showHint('Выбор отменен');
     return;
   }
   
+  // Первичный выбор фишки
   if(piece && parseInt(piece.dataset.owner) === App.game.myPlayer) {
     await selectPiece(x, y, piece);
   } else if(piece && parseInt(piece.dataset.owner) !== App.game.myPlayer) {
@@ -292,28 +309,24 @@ function clearSelectionVisuals() {
 function clearSelection() {
   App.game.selectedPiece = null;
   App.game.groupCandidates = [];
-  App.game.moveSelectionActive = false;
-  clearSelectionVisuals();
-}
-
-function clearGroupSelection() {
-  document.querySelectorAll('.cell.group-selected').forEach(cell => {
-    cell.classList.remove('group-selected');
-  });
-  document.querySelectorAll('.group-indicator').forEach(ind => ind.remove());
   App.game.selectedGroup = [];
+  App.game.moveSelectionActive = false;
+  App.game.selectionLocked = false;
+  clearSelectionVisuals();
 }
 
 async function selectPiece(x, y, piece) {
   const pieceType = piece.dataset.kind;
+  const ruType = convertFromApiShipType(pieceType);
   
-  if(IMMOBILE_TYPES.includes(convertFromApiShipType(pieceType))) {
+  if(IMMOBILE_TYPES.includes(ruType)) {
     showNotification('Ошибка', 'Эта фишка неподвижна', 'error');
-    return;
-  }
+    return
+      }
   
   App.game.moveSelectionActive = true;
   
+  // Получаем кандидатов в группу
   try {
     const [realX, realY] = uiToReal(x, y);
     const response = await api(`/game/group_candidates/${App.game.id}/`, 'POST', {coord: [realX, realY]});
@@ -325,17 +338,499 @@ async function selectPiece(x, y, piece) {
   App.game.selectedPiece = {x, y, kind: pieceType};
   highlightCell(x, y, 'selected');
   
+  // Подсвечиваем кандидатов в группу
   if(App.game.groupCandidates.length > 0) {
     App.game.groupCandidates.forEach(coord => {
-      highlightCell(coord[0], coord[1], 'group-candidate');
+      const [uiX, uiY] = realToUi(coord[0], coord[1]);
+      highlightCell(uiX, uiY, 'group-candidate');
     });
-    showHint(`Выбрана ${convertFromApiShipType(pieceType)}. Кликните на мигающие фишки для группы или выберите ход`);
+    showHint(`Выбрана ${ruType}. Кликните на мигающие фишки для группы или выберите ход`);
   } else {
-    showHint(`Выбрана ${convertFromApiShipType(pieceType)}. Выберите клетку для перемещения`);
+    showHint(`Выбрана ${ruType}. Выберите клетку для перемещения`);
   }
   
+  // Показываем возможные ходы
   await showValidMoves(x, y, pieceType);
+  
+  // Проверяем специальные атаки
   await checkSpecialAttacks();
+}
+
+async function addToGroup(x, y) {
+  if(!App.game.selectedPiece) return;
+  
+  // Добавляем главную фишку в группу если еще не добавлена
+  if(App.game.selectedGroup.length === 0) {
+    App.game.selectedGroup.push(App.game.selectedPiece);
+    const cell = getCellElement(App.game.selectedPiece.x, App.game.selectedPiece.y);
+    cell.classList.add('group-selected');
+    const indicator = document.createElement('div');
+    indicator.className = 'group-indicator';
+    cell.appendChild(indicator);
+  }
+  
+  // Добавляем новую фишку в группу
+  App.game.selectedGroup.push({x, y});
+  
+  const cell = getCellElement(x, y);
+  cell.classList.remove('group-candidate');
+  cell.classList.add('group-selected');
+  const indicator = document.createElement('div');
+  indicator.className = 'group-indicator';
+  cell.appendChild(indicator);
+  
+  // Убираем остальных кандидатов если группа полная
+  if(App.game.selectedGroup.length >= 3) {
+    document.querySelectorAll('.cell.group-candidate').forEach(cell => {
+      cell.classList.remove('group-candidate');
+    });
+  }
+  
+  // Пересчитываем силу группы
+  const groupStrength = App.game.selectedGroup.reduce((sum, coord) => {
+    const piece = getCellElement(coord.x, coord.y).querySelector('.piece');
+    if(piece) {
+      const shipType = convertFromApiShipType(piece.dataset.kind);
+      return sum + (SHIP_TYPES[shipType]?.rank || 0);
+    }
+    return sum;
+  }, 0);
+  
+  showHint(`Группа из ${App.game.selectedGroup.length} фишек. Сила группы: ${groupStrength}`);
+  
+  // Показываем ходы для группы
+  await showGroupMoves();
+  
+  App.game.selectedPiece = null;
+  App.game.groupCandidates = [];
+}
+
+async function showValidMoves(x, y, pieceType) {
+  document.querySelectorAll('.cell.valid-move').forEach(c => c.classList.remove('valid-move'));
+  
+  const apiType = convertToApiShipType(convertFromApiShipType(pieceType));
+  const directions = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
+  
+  if(apiType === 'TK') {
+    // ТК может ходить на 1-2 клетки
+    directions.forEach(dir => {
+      for(let dist = 1; dist <= 2; dist++) {
+        const nx = x + dir.dx * dist;
+        const ny = y + dir.dy * dist;
+        
+        if(nx >= 0 && nx < 14 && ny >= 0 && ny < 15) {
+          const cell = getCellElement(nx, ny);
+          const piece = cell.querySelector('.piece');
+          
+          if(!piece || parseInt(piece.dataset.owner) !== App.game.myPlayer) {
+            highlightCell(nx, ny, 'valid-move');
+          }
+          
+          if(piece) break; // Останавливаемся на первом препятствии
+        }
+      }
+    });
+  } else {
+    // Остальные фишки ходят на 1 клетку
+    directions.forEach(dir => {
+      const nx = x + dir.dx;
+      const ny = y + dir.dy;
+      
+      if(nx >= 0 && nx < 14 && ny >= 0 && ny < 15) {
+        const cell = getCellElement(nx, ny);
+        const piece = cell.querySelector('.piece');
+        
+        if(!piece || parseInt(piece.dataset.owner) !== App.game.myPlayer) {
+          highlightCell(nx, ny, 'valid-move');
+        }
+      }
+    });
+  }
+}
+
+async function showGroupMoves() {
+  document.querySelectorAll('.cell.valid-move').forEach(cell => cell.classList.remove('valid-move'));
+  
+  const adjacentCells = new Set();
+  
+  App.game.selectedGroup.forEach(piece => {
+    const {x, y} = piece;
+    const directions = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
+    
+    directions.forEach(dir => {
+      const nx = x + dir.dx;
+      const ny = y + dir.dy;
+      
+      if(nx >= 0 && nx < 14 && ny >= 0 && ny < 15) {
+        const isGroupMember = App.game.selectedGroup.some(p => p.x === nx && p.y === ny);
+        if(!isGroupMember) {
+          const cell = getCellElement(nx, ny);
+          const piece = cell.querySelector('.piece');
+          
+          if(!piece || parseInt(piece.dataset.owner) !== App.game.myPlayer) {
+            adjacentCells.add(`${nx},${ny}`);
+          }
+        }
+      }
+    });
+  });
+  
+  adjacentCells.forEach(coord => {
+    const [x, y] = coord.split(',').map(Number);
+    highlightCell(x, y, 'valid-move');
+  });
+}
+
+async function checkSpecialAttacks() {
+  try {
+    const response = await api(`/game/special_attacks/${App.game.id}/`);
+    App.game.specialAttacks = response.options;
+    
+    // Торпедная атака
+    if(App.game.specialAttacks.torpedo.length > 0) {
+      App.game.specialAttacks.torpedo.forEach(attack => {
+        const [uiTkX, uiTkY] = realToUi(attack.tk[0], attack.tk[1]);
+        if(App.game.selectedPiece && 
+           (App.game.selectedPiece.x === uiTkX && App.game.selectedPiece.y === uiTkY)) {
+          showTorpedoDirections(attack);
+          showHint('Доступна торпедная атака! Выберите направление стрельбы');
+        }
+      });
+    }
+    
+    // Воздушная атака
+    if(App.game.specialAttacks.air.length > 0) {
+      App.game.specialAttacks.air.forEach(attack => {
+        const [uiCarrierX, uiCarrierY] = realToUi(attack.carrier[0], attack.carrier[1]);
+        if(App.game.selectedPiece && 
+           (App.game.selectedPiece.x === uiCarrierX && App.game.selectedPiece.y === uiCarrierY)) {
+          showAirAttackZone(attack);
+          showHint('Доступна воздушная атака! Кликните на зону атаки');
+        }
+      });
+    }
+  } catch(e) {
+    App.game.specialAttacks = {torpedo: [], air: []};
+  }
+}
+
+function showTorpedoDirections(attack) {
+  const [uiTorpedoX, uiTorpedoY] = realToUi(attack.torpedo[0], attack.torpedo[1]);
+  
+  attack.directions.forEach(dir => {
+    const [dx, dy] = dir;
+    let x = uiTorpedoX;
+    let y = uiTorpedoY;
+    
+    for(let i = 1; i <= 7; i++) {
+      x += dx;
+      y += dy;
+      
+      if(x >= 0 && x < 14 && y >= 0 && y < 15) {
+        const cell = getCellElement(x, y);
+        cell.classList.add('torpedo-direction');
+        cell.dataset.torpedoDir = `${dx},${dy}`;
+        
+        const piece = cell.querySelector('.piece');
+        if(piece) break; // Останавливаемся на первом препятствии
+      } else {
+        break;
+      }
+    }
+  });
+}
+
+function showAirAttackZone(attack) {
+  const direction = attack.direction;
+  const [uiPlaneX, uiPlaneY] = realToUi(attack.plane[0], attack.plane[1]);
+  let x = uiPlaneX;
+  let y = uiPlaneY;
+  
+  for(let i = 1; i <= 5; i++) {
+    y += direction;
+    
+    if(x >= 0 && x < 14 && y >= 0 && y < 15) {
+      const cell = getCellElement(x, y);
+      cell.classList.add('air-attack-zone');
+    } else {
+      break;
+    }
+  }
+}
+
+async function executeTorpedoAttack(x, y) {
+  const cell = getCellElement(x, y);
+  const direction = cell.dataset.torpedoDir.split(',').map(Number);
+  
+  if(!App.game.selectedPiece) return;
+  
+  const tkCoord = [App.game.selectedPiece.x, App.game.selectedPiece.y];
+  let torpedoCoord = null;
+  
+  // Находим торпеду рядом с ТК
+  const directions = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
+  for(const dir of directions) {
+    const nx = tkCoord[0] + dir.dx;
+    const ny = tkCoord[1] + dir.dy;
+    const adjCell = getCellElement(nx, ny);
+    const adjPiece = adjCell?.querySelector('.piece');
+    
+    if(adjPiece && adjPiece.dataset.kind === 'T' && 
+       parseInt(adjPiece.dataset.owner) === App.game.myPlayer) {
+      torpedoCoord = [nx, ny];
+      break;
+    }
+  }
+  
+  if(!torpedoCoord) {
+    showNotification('Ошибка', 'Торпеда не найдена', 'error');
+    return;
+  }
+  
+  try {
+    App.game.selectionLocked = true;
+    const [realTorpedoX, realTorpedoY] = uiToReal(torpedoCoord[0], torpedoCoord[1]);
+    const [realTkX, realTkY] = uiToReal(tkCoord[0], tkCoord[1]);
+    
+    const res = await api(`/game/torpedo/${App.game.id}/`, 'POST', {
+      torpedo: [realTorpedoX, realTorpedoY],
+      tk: [realTkX, realTkY],
+      direction: direction
+    });
+    
+    if(res.ok) {
+      App.game.state = res.state;
+      clearSelection();
+      renderGameStatic();
+      updateKilledTable();
+      
+      if(res.result && res.result.captures && res.result.captures.length > 0) {
+        showNotification('Торпедная атака!', `Уничтожено: ${res.result.captures.join(', ')}`, 'success');
+      } else {
+        showNotification('Торпедная атака!', 'Промах', 'info');
+      }
+      
+      App.game.isMyTurn = false;
+      showHint('Ход противника');
+    }
+  } catch(err) {
+    showNotification('Ошибка', 'Не удалось выполнить торпедную атаку: ' + err.message, 'error');
+    clearSelection();
+  } finally {
+    App.game.selectionLocked = false;
+  }
+}
+
+async function executeAirAttack(x, y) {
+  if(!App.game.selectedPiece) return;
+  
+  const carrierCoord = [App.game.selectedPiece.x, App.game.selectedPiece.y];
+  const direction = App.game.myPlayer === 1 ? -1 : 1;
+  const planeCoord = [carrierCoord[0], carrierCoord[1] + direction];
+  
+  try {
+    App.game.selectionLocked = true;
+    const [realCarrierX, realCarrierY] = uiToReal(carrierCoord[0], carrierCoord[1]);
+    const [realPlaneX, realPlaneY] = uiToReal(planeCoord[0], planeCoord[1]);
+    
+    const res = await api(`/game/air/${App.game.id}/`, 'POST', {
+      carrier: [realCarrierX, realCarrierY],
+      plane: [realPlaneX, realPlaneY]
+    });
+    
+    if(res.ok) {
+      App.game.state = res.state;
+      clearSelection();
+      renderGameStatic();
+      updateKilledTable();
+      
+      if(res.result && res.result.captures && res.result.captures.length > 0) {
+        showNotification('Воздушная атака!', `Уничтожено: ${res.result.captures.length} целей`, 'success');
+      } else {
+        showNotification('Воздушная атака!', 'Цели не обнаружены', 'info');
+      }
+      
+      App.game.isMyTurn = false;
+      showHint('Ход противника');
+    }
+  } catch(err) {
+    showNotification('Ошибка', 'Не удалось выполнить воздушную атаку: ' + err.message, 'error');
+    clearSelection();
+  } finally {
+    App.game.selectionLocked = false;
+  }
+}
+
+async function movePiece(fx, fy, tx, ty) {
+  try {
+    App.game.selectionLocked = true;
+    
+    // Получаем переносимые фишки
+    const followers = [];
+    try {
+      const [realFx, realFy] = uiToReal(fx, fy);
+      const response = await api(`/game/carried_pieces/${App.game.id}/`, 'POST', {coord: [realFx, realFy]});
+      const carried = response.carried || [];
+      
+      // Размещаем переносимые фишки вокруг новой позиции
+      carried.forEach(carriedCoord => {
+        const directions = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
+        for(const dir of directions) {
+          const newX = tx + dir.dx;
+          const newY = ty + dir.dy;
+          
+          if(newX >= 0 && newX < 14 && newY >= 0 && newY < 15) {
+            const cell = getCellElement(newX, newY);
+            if(!cell.querySelector('.piece')) {
+              const [realNewX, realNewY] = uiToReal(newX, newY);
+              followers.push([carriedCoord[0], carriedCoord[1], realNewX, realNewY]);
+              break;
+            }
+          }
+        }
+      });
+    } catch(e) {}
+    
+    const [realFx, realFy] = uiToReal(fx, fy);
+    const [realTx, realTy] = uiToReal(tx, ty);
+    
+    const res = await api(`/game/move/${App.game.id}/`, 'POST', {
+      src: [realFx, realFy],
+      dst: [realTx, realTy],
+      followers: followers
+    });
+    
+    if(res.ok) {
+      App.game.state = res.state;
+      clearSelection();
+      renderGameStatic();
+      updateKilledTable();
+      
+      if(res.result && res.result.event) {
+        handleMoveResult(res.result);
+      } else {
+        showHint('Ход выполнен. Ход противника');
+      }
+      
+      App.game.isMyTurn = false;
+      
+      // Проверяем победу
+      if(App.game.state.winner) {
+        App.game.gameFinished = true;
+        showGameResult(App.game.state.winner, App.game.state.win_reason);
+      }
+    }
+  } catch(err) {
+    showNotification('Ошибка', 'Не удалось выполнить ход: ' + err.message, 'error');
+    clearSelection();
+  } finally {
+    App.game.selectionLocked = false;
+  }
+}
+
+async function moveGroup(toX, toY) {
+  if(App.game.selectedGroup.length === 0) return;
+  
+  try {
+    App.game.selectionLocked = true;
+    
+    const leader = App.game.selectedGroup[0];
+    const followers = App.game.selectedGroup.slice(1).map(p => {
+      const [realPx, realPy] = uiToReal(p.x, p.y);
+      // Размещаем остальных членов группы вокруг лидера
+      const directions = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
+      for(const dir of directions) {
+        const newX = toX + dir.dx;
+        const newY = toY + dir.dy;
+        if(newX >= 0 && newX < 14 && newY >= 0 && newY < 15) {
+          const [realTx, realTy] = uiToReal(newX, newY);
+          return [realPx, realPy, realTx, realTy];
+        }
+      }
+      const [realTx, realTy] = uiToReal(toX, toY);
+      return [realPx, realPy, realTx, realTy];
+    });
+    
+    const [realLx, realLy] = uiToReal(leader.x, leader.y);
+    const [realTx, realTy] = uiToReal(toX, toY);
+    
+    const res = await api(`/game/move/${App.game.id}/`, 'POST', {
+      src: [realLx, realLy],
+      dst: [realTx, realTy],
+      followers: followers
+    });
+    
+    if(res.ok) {
+      App.game.state = res.state;
+      clearSelection();
+      renderGameStatic();
+      updateKilledTable();
+      
+      if(res.result && res.result.event) {
+        handleMoveResult(res.result);
+      } else {
+        showHint('Группа перемещена. Ход противника');
+      }
+      
+      App.game.isMyTurn = false;
+      
+      // Проверяем победу
+      if(App.game.state.winner) {
+        App.game.gameFinished = true;
+        showGameResult(App.game.state.winner, App.game.state.win_reason);
+      }
+    }
+  } catch(err) {
+    showNotification('Ошибка', 'Не удалось переместить группу: ' + err.message, 'error');
+    clearSelection();
+  } finally {
+    App.game.selectionLocked = false;
+  }
+}
+
+function handleMoveResult(result) {
+  switch(result.event) {
+    case 'combat':
+      if(result.captures && result.captures.length > 0) {
+        showNotification('Бой!', `Уничтожено: ${result.captures.join(', ')}`, 'success');
+      }
+      if(result.destroyed_own && result.destroyed_own.length > 0) {
+        showNotification('Потери', `Потеряно: ${result.destroyed_own.join(', ')}`, 'warning');
+      }
+      break;
+    case 'explosion':
+    case 'atomic_explosion':
+      showNotification('Взрыв!', `Уничтожено фишек: ${result.captures.length}`, 'warning');
+      showExplosionEffect();
+      break;
+    case 'mine_explosion':
+      showNotification('Мина!', 'Ваша фишка подорвалась на мине', 'error');
+      break;
+    case 'mine_cleared':
+      showNotification('Тральщик', 'Мина успешно обезврежена', 'success');
+      break;
+    case 'tanker_explosion':
+      showNotification('Танкер взорвался!', 'Обе фишки уничтожены', 'warning');
+      break;
+    case 'static_mine_explosion':
+      showNotification('Стационарная мина!', 'Фишка уничтожена', 'error');
+      break;
+    case 'draw':
+      showNotification('Ничья', 'Силы равны, фишки обменялись', 'info');
+      break;
+    default:
+      showHint('Ход выполнен. Ход противника');
+  }
+}
+
+function showExplosionEffect() {
+  const explosion = document.createElement('div');
+  explosion.className = 'explosion-effect';
+  document.body.appendChild(explosion);
+  
+  setTimeout(() => {
+    explosion.remove();
+  }, 800);
 }
 
 async function placeShip(x, y, shipType) {
@@ -363,105 +858,12 @@ async function placeShip(x, y, shipType) {
       App.game.state = res.state;
       App.game.shipCounts[shipType]--;
       updateShipCounts();
-      renderGame();
+      renderGameStatic();
       checkAllShipsPlaced();
       showNotification('Успех', `${shipType} размещен`, 'success');
     }
   } catch(err) {
     showNotification('Ошибка', 'Не удалось разместить корабль: ' + err.message, 'error');
-  }
-}
-
-async function movePiece(fx, fy, tx, ty) {
-  try {
-    const followers = [];
-    
-    if(App.game.selectedGroup.length > 0) {
-            const leader = App.game.selectedGroup[0];
-      App.game.selectedGroup.slice(1).forEach(p => {
-        followers.push([p.x, p.y, tx, ty]);
-      });
-      fx = leader.x;
-      fy = leader.y;
-    }
-    
-    if(App.game.selectedPiece) {
-      try {
-        const response = await api(`/game/carried_pieces/${App.game.id}/`, 'POST', {coord: [fx, fy]});
-        const carried = response.carried || [];
-        
-        carried.forEach(carriedCoord => {
-          const directions = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
-          for(const dir of directions) {
-            const newX = tx + dir.dx;
-            const newY = ty + dir.dy;
-            
-            if(newX >= 0 && newX < 14 && newY >= 0 && newY < 15) {
-              const cell = getCellElement(newX, newY);
-              if(!cell.querySelector('.piece')) {
-                followers.push([carriedCoord[0], carriedCoord[1], newX, newY]);
-                break;
-              }
-            }
-          }
-        });
-      } catch(e) {}
-    }
-    
-    const res = await api(`/game/move/${App.game.id}/`, 'POST', {
-      src: [fx, fy],
-      dst: [tx, ty],
-      followers: followers
-    });
-    
-    if(res.ok) {
-      App.game.state = res.state;
-      renderGame();
-      clearSelection();
-      clearGroupSelection();
-      updateKilledTable();
-      
-      if(res.result && res.result.event) {
-        handleMoveResult(res.result);
-      } else {
-        showHint('Ход выполнен. Ход противника');
-      }
-    }
-  } catch(err) {
-    showNotification('Ошибка', 'Не удалось выполнить ход: ' + err.message, 'error');
-    clearSelection();
-    clearGroupSelection();
-  }
-}
-
-async function moveGroup(toX, toY) {
-  if(App.game.selectedGroup.length === 0) return;
-  
-  try {
-    const leader = App.game.selectedGroup[0];
-    const followers = App.game.selectedGroup.slice(1).map(p => [p.x, p.y, toX, toY]);
-    
-    const res = await api(`/game/move/${App.game.id}/`, 'POST', {
-      src: [leader.x, leader.y],
-      dst: [toX, toY],
-      followers: followers
-    });
-    
-    if(res.ok) {
-      App.game.state = res.state;
-      renderGame();
-      clearGroupSelection();
-      updateKilledTable();
-      
-      if(res.result && res.result.event) {
-        handleMoveResult(res.result);
-      } else {
-        showHint('Группа перемещена. Ход противника');
-      }
-    }
-  } catch(err) {
-    showNotification('Ошибка', 'Не удалось переместить группу: ' + err.message, 'error');
-    clearGroupSelection();
   }
 }
 
@@ -484,6 +886,9 @@ function createGameUI() {
         <button id="pauseBtn" class="menuButs xs">Пауза</button>
         <button id="resignBtn" class="menuButs xs danger">Сдаться</button>
       `}
+    </div>
+    <div class="mobile-fleet" id="mobileFleet">
+      <div class="mobile-fleet-inner" id="mobileFleetInner"></div>
     </div>
     <div class="side-panel" id="leftPanel">
       <div class="side-panel-inner" id="leftPanelInner"></div>
@@ -511,6 +916,7 @@ function createGameUI() {
   const resignBtn = document.getElementById('resignBtn');
   const leftPanelInner = document.getElementById('leftPanelInner');
   const rightPanelInner = document.getElementById('rightPanelInner');
+  const mobileFleetInner = document.getElementById('mobileFleetInner');
   
   if(autoPlaceBtn) autoPlaceBtn.addEventListener('click', autoSetup);
   if(clearPlaceBtn) clearPlaceBtn.addEventListener('click', clearSetup);
@@ -518,42 +924,60 @@ function createGameUI() {
   if(pauseBtn) pauseBtn.addEventListener('click', openPauseModal);
   if(resignBtn) resignBtn.addEventListener('click', openResignModal);
   
-  renderFleetPanels(leftPanelInner, rightPanelInner);
+  renderFleetPanels(leftPanelInner, rightPanelInner, mobileFleetInner);
   clearBoard();
   fitBoard();
   window.addEventListener('resize', fitBoard);
 }
 
+// ИСПРАВЛЕННАЯ СИСТЕМА POLLING - БЕЗ ПОСТОЯННЫХ ОБНОВЛЕНИЙ
 function startGamePolling() {
-  if(App.game.pollTimer) clearInterval(App.game.pollTimer);
+  stopGamePolling(); // Останавливаем предыдущий polling
   
-  App.game.pollTimer = setInterval(async () => {
-    if(!App.game.id) return;
+  App.game.pollingStopped = false;
+  
+  const poll = async () => {
+    if(App.game.pollingStopped || !App.game.id) return;
     
     try {
+      // Получаем состояние игры только если это необходимо
       const stateData = await api(`/game/state/${App.game.id}/`);
       if(stateData && stateData.state) {
         const oldPhase = App.game.state?.phase;
+        const oldTurn = App.game.state?.turn;
+        
         App.game.state = stateData.state;
         
-        if(oldPhase === 'SETUP' && stateData.state.phase !== 'SETUP') {
-          App.game.setupPhase = false;
-          showNotification('Игра началась!', 'Фаза расстановки завершена', 'success');
-          if(waitOpponentModal) waitOpponentModal.style.display = 'none';
-          if(App.game.setupTimer) {
-            clearInterval(App.game.setupTimer);
-            App.game.setupTimer = null;
+        // Обновляем UI только при изменениях
+        if(oldPhase !== stateData.state.phase || oldTurn !== stateData.state.turn) {
+          if(oldPhase === 'SETUP' && stateData.state.phase !== 'SETUP') {
+            App.game.setupPhase = false;
+            showNotification('Игра началась!', 'Фаза расстановки завершена', 'success');
+            if(waitOpponentModal) waitOpponentModal.style.display = 'none';
+            if(App.game.setupTimer) {
+              clearInterval(App.game.setupTimer);
+              App.game.setupTimer = null;
+            }
+            createGameUI();
           }
-          createGameUI();
-        }
-        
-        renderGame();
-        
-        if(stateData.state.winner) {
-          showGameResult(stateData.state.winner, stateData.state.win_reason);
+          
+          // Обновляем только если не в режиме выбора хода
+          if(!App.game.moveSelectionActive) {
+            renderGameStatic();
+          }
+          
+          // Проверяем чей ход
+          App.game.isMyTurn = (stateData.state.turn === App.game.myPlayer);
+          
+          if(stateData.state.winner) {
+            App.game.gameFinished = true;
+            showGameResult(stateData.state.winner, stateData.state.win_reason);
+            return; // Останавливаем polling
+          }
         }
       }
       
+      // Получаем таймеры
       const timerData = await api(`/game/timers/${App.game.id}/`);
       if(timerData) {
         updateTimers(timerData);
@@ -561,19 +985,39 @@ function startGamePolling() {
         App.game.pausesUsed.long = !timerData.long_available;
         
         if(timerData.paused && typeof timerData.pause_left === 'number') {
+          App.game.pauseActive = true;
           showPauseOverlay(timerData.pause_left, (timerData.pause_initiator === App.game.myPlayer));
         } else {
+          App.game.pauseActive = false;
           hidePauseOverlay();
         }
         
         if(timerData.finished && timerData.winner_player) {
+          App.game.gameFinished = true;
           showGameResult(timerData.winner_player, timerData.reason);
+          return; // Останавливаем polling
         }
       }
     } catch(err) {
       console.error('Polling error:', err);
     }
-  }, 1000);
+    
+    // Продолжаем polling только если игра активна
+    if(!App.game.pollingStopped && !App.game.gameFinished) {
+      setTimeout(poll, 3000); // Увеличиваем  интервал до 3 секунд
+    }
+  };
+  
+  // Запускаем первый poll через небольшую задержку
+  setTimeout(poll, 1000);
+}
+
+function stopGamePolling() {
+  App.game.pollingStopped = true;
+  if(App.game.pollTimer) {
+    clearInterval(App.game.pollTimer);
+    App.game.pollTimer = null;
+  }
 }
 
 function updateTimers(data) {
@@ -611,15 +1055,45 @@ function updateTimers(data) {
   }
 }
 
-function renderGame() {
+// СТАТИЧЕСКИЙ РЕНДЕРИНГ - БЕЗ СБРОСА ВЫДЕЛЕНИЙ
+function renderGameStatic() {
   const state = App.game.state || {};
-  clearBoard();
-  
   const boardEl = document.getElementById('board');
   if(!boardEl) return;
   
+  // Сохраняем текущие выделения
+  const selectedCells = Array.from(document.querySelectorAll('.cell.selected')).map(cell => ({
+    x: parseInt(cell.dataset.x),
+    y: parseInt(cell.dataset.y)
+  }));
+  const validMoveCells = Array.from(document.querySelectorAll('.cell.valid-move')).map(cell => ({
+    x: parseInt(cell.dataset.x),
+    y: parseInt(cell.dataset.y)
+  }));
+  const groupCandidateCells = Array.from(document.querySelectorAll('.cell.group-candidate')).map(cell => ({
+    x: parseInt(cell.dataset.x),
+    y: parseInt(cell.dataset.y)
+  }));
+  const groupSelectedCells = Array.from(document.querySelectorAll('.cell.group-selected')).map(cell => ({
+    x: parseInt(cell.dataset.x),
+    y: parseInt(cell.dataset.y)
+  }));
+  const torpedoDirectionCells = Array.from(document.querySelectorAll('.cell.torpedo-direction')).map(cell => ({
+    x: parseInt(cell.dataset.x),
+    y: parseInt(cell.dataset.y),
+    dir: cell.dataset.torpedoDir
+  }));
+  const airAttackCells = Array.from(document.querySelectorAll('.cell.air-attack-zone')).map(cell => ({
+    x: parseInt(cell.dataset.x),
+    y: parseInt(cell.dataset.y)
+  }));
+  
+  // Очищаем только фишки, не трогая выделения
+  document.querySelectorAll('.piece').forEach(piece => piece.remove());
+  
   const board = state.board || {};
   
+  // Рендерим фишки
   Object.keys(board).forEach(coordKey => {
     const [realX, realY] = coordKey.split(',').map(Number);
     const [uiX, uiY] = realToUi(realX, realY);
@@ -641,13 +1115,55 @@ function renderGame() {
     }
   });
   
+  // Восстанавливаем выделения только если режим выбора активен
+  if(App.game.moveSelectionActive) {
+    selectedCells.forEach(coord => {
+      const cell = getCellElement(coord.x, coord.y);
+      if(cell) cell.classList.add('selected');
+    });
+    
+    validMoveCells.forEach(coord => {
+      const cell = getCellElement(coord.x, coord.y);
+      if(cell) cell.classList.add('valid-move');
+    });
+    
+    groupCandidateCells.forEach(coord => {
+      const cell = getCellElement(coord.x, coord.y);
+      if(cell) cell.classList.add('group-candidate');
+    });
+    
+    groupSelectedCells.forEach(coord => {
+      const cell = getCellElement(coord.x, coord.y);
+      if(cell) {
+        cell.classList.add('group-selected');
+        const indicator = document.createElement('div');
+        indicator.className = 'group-indicator';
+        cell.appendChild(indicator);
+      }
+    });
+    
+    torpedoDirectionCells.forEach(coord => {
+      const cell = getCellElement(coord.x, coord.y);
+      if(cell) {
+        cell.classList.add('torpedo-direction');
+        cell.dataset.torpedoDir = coord.dir;
+      }
+    });
+    
+    airAttackCells.forEach(coord => {
+      const cell = getCellElement(coord.x, coord.y);
+      if(cell) cell.classList.add('air-attack-zone');
+    });
+  }
+  
   fitBoard();
   updateKilledTable();
   
   if(!App.game.setupPhase) {
     renderFleetPanels(
       document.getElementById('leftPanelInner'),
-      document.getElementById('rightPanelInner')
+      document.getElementById('rightPanelInner'),
+      document.getElementById('mobileFleetInner')
     );
   }
 }
@@ -823,8 +1339,7 @@ function renderUsers(arr){
   if(!usersList) return;
   usersList.innerHTML='';
   if(App.isAuth){
-    api('/accounts/api/me/').then(me=>{
-      const meItem = {id: me.id, login: me.login, username: me.username, rating: me.rating_elo || 0, wins: me.wins || 0, losses: me.losses || 0, isMe:true};
+    api('/accounts/api/me/').then(me=>{const meItem = {id: me.id, login: me.login, username: me.username, rating: me.rating_elo || 0, wins: me.wins || 0, losses: me.losses || 0, isMe:true};
       const ids = new Set(arr.map(i=>i.id));
       if(!ids.has(meItem.id)) arr.push(meItem);
       arr.sort((a,b) => (ratingValue(b) - ratingValue(a)));
@@ -1011,7 +1526,7 @@ async function inviteUser(userId) {
       }, res.token);
     }
   } catch(err) {
-        showNotification('Ошибка', 'Не удалось отправить приглашение', 'error');
+    showNotification('Ошибка', 'Не удалось отправить приглашение', 'error');
   }
 }
 
@@ -1020,7 +1535,7 @@ function initializeShipCounts() {
   Object.keys(SHIP_TYPES).forEach(type => { App.game.shipCounts[type] = SHIP_TYPES[type].count; });
 }
 
-function renderFleetPanels(leftPanel, rightPanel) {
+function renderFleetPanels(leftPanel, rightPanel, mobilePanel) {
   if(!leftPanel || !rightPanel) return;
   
   const shipTypes = Object.keys(SHIP_TYPES);
@@ -1028,6 +1543,7 @@ function renderFleetPanels(leftPanel, rightPanel) {
   
   leftPanel.innerHTML = '';
   rightPanel.innerHTML = '';
+  if(mobilePanel) mobilePanel.innerHTML = '';
   
   shipTypes.slice(0, halfIndex).forEach(type => {
     const item = document.createElement('div');
@@ -1038,7 +1554,7 @@ function renderFleetPanels(leftPanel, rightPanel) {
     if(App.game.setupPhase) {
       count = App.game.shipCounts[type] || 0;
     } else {
-      count = SHIP_TYPES[type].count;
+      count = 0;
     }
     
     item.innerHTML = `${type} (${count})`;
@@ -1054,6 +1570,14 @@ function renderFleetPanels(leftPanel, rightPanel) {
       else item.addEventListener('click', () => selectShip(type));
     }
     leftPanel.appendChild(item);
+    
+    if(mobilePanel) {
+      const mobileItem = item.cloneNode(true);
+      if(App.game.setupPhase && count > 0) {
+        mobileItem.addEventListener('click', () => selectShip(type));
+      }
+      mobilePanel.appendChild(mobileItem);
+    }
   });
   
   shipTypes.slice(halfIndex).forEach(type => {
@@ -1065,7 +1589,7 @@ function renderFleetPanels(leftPanel, rightPanel) {
     if(App.game.setupPhase) {
       count = App.game.shipCounts[type] || 0;
     } else {
-      count = SHIP_TYPES[type].count;
+      count = 0;
     }
     
     item.innerHTML = `${type} (${count})`;
@@ -1081,6 +1605,14 @@ function renderFleetPanels(leftPanel, rightPanel) {
       else item.addEventListener('click', () => selectShip(type));
     }
     rightPanel.appendChild(item);
+    
+    if(mobilePanel) {
+      const mobileItem = item.cloneNode(true);
+      if(App.game.setupPhase && count > 0) {
+        mobileItem.addEventListener('click', () => selectShip(type));
+      }
+      mobilePanel.appendChild(mobileItem);
+    }
   });
 }
 
@@ -1092,327 +1624,12 @@ function selectShip(type) {
   }
   
   document.querySelectorAll('.fleet-item').forEach(item => item.classList.remove('selected'));
-  const item = document.querySelector(`[data-ship="${type}"]`);
-  if(item) {
-    item.classList.add('selected');
-    App.game.selectedShip = type;
-    clearSelection();
-    showHint(`Выбран ${type}. Кликните на клетку в своей зоне для размещения`);
-  }
-}
-
-async function addToGroup(x, y) {
-  if(!App.game.selectedPiece) return;
+  const items = document.querySelectorAll(`[data-ship="${type}"]`);
+  items.forEach(item => item.classList.add('selected'));
   
-  App.game.selectedGroup.push(App.game.selectedPiece);
-  App.game.selectedGroup.push({x, y});
-  
-  document.querySelectorAll('.cell.group-candidate').forEach(cell => {
-    cell.classList.remove('group-candidate');
-  });
-  
-  App.game.selectedGroup.forEach(coord => {
-    const cell = getCellElement(coord.x, coord.y);
-    cell.classList.add('group-selected');
-    const indicator = document.createElement('div');
-    indicator.className = 'group-indicator';
-    cell.appendChild(indicator);
-  });
-  
-  const groupStrength = App.game.selectedGroup.reduce((sum, coord) => {
-    const piece = getCellElement(coord.x, coord.y).querySelector('.piece');
-    if(piece) {
-      const shipType = convertFromApiShipType(piece.dataset.kind);
-      return sum + (SHIP_TYPES[shipType]?.rank || 0);
-    }
-    return sum;
-  }, 0);
-  
-  showHint(`Группа из ${App.game.selectedGroup.length} фишек. Сила группы: ${groupStrength}`);
-  
-  await showGroupMoves();
-  
-  App.game.selectedPiece = null;
-  App.game.groupCandidates = [];
-}
-
-async function showValidMoves(x, y, pieceType) {
-  document.querySelectorAll('.cell.valid-move').forEach(c => c.classList.remove('valid-move'));
-  
-  const apiType = convertToApiShipType(convertFromApiShipType(pieceType));
-  const directions = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
-  
-  if(apiType === 'TK') {
-    directions.forEach(dir => {
-      for(let dist = 1; dist <= 2; dist++) {
-        const nx = x + dir.dx * dist;
-        const ny = y + dir.dy * dist;
-        
-        if(nx >= 0 && nx < 14 && ny >= 0 && ny < 15) {
-          const cell = getCellElement(nx, ny);
-          const piece = cell.querySelector('.piece');
-          
-          if(!piece || parseInt(piece.dataset.owner) !== App.game.myPlayer) {
-            highlightCell(nx, ny, 'valid-move');
-          }
-          
-          if(piece) break;
-        }
-      }
-    });
-  } else {
-    directions.forEach(dir => {
-      const nx = x + dir.dx;
-      const ny = y + dir.dy;
-      
-      if(nx >= 0 && nx < 14 && ny >= 0 && ny < 15) {
-        const cell = getCellElement(nx, ny);
-        const piece = cell.querySelector('.piece');
-        
-        if(!piece || parseInt(piece.dataset.owner) !== App.game.myPlayer) {
-          highlightCell(nx, ny, 'valid-move');
-        }
-      }
-    });
-  }
-}
-
-async function showGroupMoves() {
-  document.querySelectorAll('.cell.valid-move').forEach(cell => cell.classList.remove('valid-move'));
-  
-  const adjacentCells = new Set();
-  
-  App.game.selectedGroup.forEach(piece => {
-    const {x, y} = piece;
-    const directions = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
-    
-    directions.forEach(dir => {
-      const nx = x + dir.dx;
-      const ny = y + dir.dy;
-      
-      if(nx >= 0 && nx < 14 && ny >= 0 && ny < 15) {
-        const isGroupMember = App.game.selectedGroup.some(p => p.x === nx && p.y === ny);
-        if(!isGroupMember) {
-          const cell = getCellElement(nx, ny);
-          const piece = cell.querySelector('.piece');
-          
-          if(!piece || parseInt(piece.dataset.owner) !== App.game.myPlayer) {
-            adjacentCells.add(`${nx},${ny}`);
-          }
-        }
-      }
-    });
-  });
-  
-  adjacentCells.forEach(coord => {
-    const [x, y] = coord.split(',').map(Number);
-    highlightCell(x, y, 'valid-move');
-  });
-}
-
-async function checkSpecialAttacks() {
-  try {
-    const response = await api(`/game/special_attacks/${App.game.id}/`);
-    App.game.specialAttacks = response.options;
-    
-    if(App.game.specialAttacks.torpedo.length > 0) {
-      App.game.specialAttacks.torpedo.forEach(attack => {
-        if(App.game.selectedPiece && 
-           (App.game.selectedPiece.x === attack.tk[0] && App.game.selectedPiece.y === attack.tk[1])) {
-          showTorpedoDirections(attack);
-          showHint('Доступна торпедная атака! Выберите направление стрельбы');
-        }
-      });
-    }
-    
-    if(App.game.specialAttacks.air.length > 0) {
-      App.game.specialAttacks.air.forEach(attack => {
-        if(App.game.selectedPiece && 
-           (App.game.selectedPiece.x === attack.carrier[0] && App.game.selectedPiece.y === attack.carrier[1])) {
-          showAirAttackZone(attack);
-          showHint('Доступна воздушная атака! Кликните на зону атаки');
-        }
-      });
-    }
-  } catch(e) {
-    App.game.specialAttacks = {torpedo: [], air: []};
-  }
-}
-
-function showTorpedoDirections(attack) {
-  const tkCell = getCellElement(attack.tk[0], attack.tk[1]);
-  const torpedoCell = getCellElement(attack.torpedo[0], attack.torpedo[1]);
-  
-  attack.directions.forEach(dir => {
-    const [dx, dy] = dir;
-    let x = attack.torpedo[0];
-    let y = attack.torpedo[1];
-    
-    for(let i = 1; i <= 7; i++) {
-      x += dx;
-      y += dy;
-      
-      if(x >= 0 && x < 14 && y >= 0 && y < 15) {
-        const cell = getCellElement(x, y);
-        cell.classList.add('torpedo-direction');
-        cell.dataset.torpedoDir = `${dx},${dy}`;
-        
-        const piece = cell.querySelector('.piece');
-        if(piece) break;
-      } else {
-        break;
-      }
-    }
-  });
-}
-
-function showAirAttackZone(attack) {
-  const direction = attack.direction;
-  let x = attack.plane[0];
-  let y = attack.plane[1];
-  
-  for(let i = 1; i <= 5; i++) {
-    y += direction;
-    
-    if(x >= 0 && x < 14 && y >= 0 && y < 15) {
-      const cell = getCellElement(x, y);
-      cell.classList.add('air-attack-zone');
-    } else {
-      break;
-    }
-  }
-}
-
-async function executeTorpedoAttack(x, y) {
-  const cell = getCellElement(x, y);
-  const direction = cell.dataset.torpedoDir.split(',').map(Number);
-  
-  if(!App.game.selectedPiece) return;
-  
-  const tkCoord = [App.game.selectedPiece.x, App.game.selectedPiece.y];
-  let torpedoCoord = null;
-  
-  const directions = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
-  for(const dir of directions) {
-    const nx = tkCoord[0] + dir.dx;
-    const ny = tkCoord[1] + dir.dy;
-    const adjCell = getCellElement(nx, ny);
-    const adjPiece = adjCell?.querySelector('.piece');
-    
-    if(adjPiece && adjPiece.dataset.kind === 'T' && 
-       parseInt(adjPiece.dataset.owner) === App.game.myPlayer) {
-      torpedoCoord = [nx, ny];
-      break;
-    }
-  }
-  
-  if(!torpedoCoord) {
-    showNotification('Ошибка', 'Торпеда не найдена', 'error');
-    return;
-  }
-  
-  try {
-    const res = await api(`/game/torpedo/${App.game.id}/`, 'POST', {
-      torpedo: torpedoCoord,
-      tk: tkCoord,
-      direction: direction
-    });
-    
-    if(res.ok) {
-      App.game.state = res.state;
-      renderGame();
-      clearSelection();
-      updateKilledTable();
-      
-      if(res.result && res.result.captures && res.result.captures.length > 0) {
-        showNotification('Торпедная атака!', `Уничтожено: ${res.result.captures.join(', ')}`, 'success');
-      } else {
-        showNotification('Торпедная атака!', 'Промах', 'info');
-      }
-    }
-  } catch(err) {
-    showNotification('Ошибка', 'Не удалось выполнить торпедную атаку: ' + err.message, 'error');
-    clearSelection();
-  }
-}
-
-async function executeAirAttack(x, y) {
-  if(!App.game.selectedPiece) return;
-  
-  const carrierCoord = [App.game.selectedPiece.x, App.game.selectedPiece.y];
-  const direction = App.game.myPlayer === 1 ? -1 : 1;
-  const planeCoord = [carrierCoord[0], carrierCoord[1] + direction];
-  
-  try {
-    const res = await api(`/game/air/${App.game.id}/`, 'POST', {
-      carrier: carrierCoord,
-      plane: planeCoord
-    });
-    
-    if(res.ok) {
-      App.game.state = res.state;
-      renderGame();
-      clearSelection();
-      updateKilledTable();
-      
-      if(res.result && res.result.captures && res.result.captures.length > 0) {
-        showNotification('Воздушная атака!', `Уничтожено: ${res.result.captures.length} целей`, 'success');
-      } else {
-        showNotification('Воздушная атака!', 'Цели не обнаружены', 'info');
-      }
-    }
-  } catch(err) {
-    showNotification('Ошибка', 'Не удалось выполнить воздушную атаку: ' + err.message, 'error');
-    clearSelection();
-  }
-}
-
-function handleMoveResult(result) {
-  switch(result.event) {
-    case 'combat':
-      if(result.captures && result.captures.length > 0) {
-        showNotification('Бой!', `Уничтожено: ${result.captures.join(', ')}`, 'success');
-      }
-      if(result.destroyed_own && result.destroyed_own.length > 0) {
-        showNotification('Потери', `Потеряно: ${result.destroyed_own.join(', ')}`, 'warning');
-      }
-      break;
-    case 'explosion':
-    case 'atomic_explosion':
-      showNotification('Взрыв!', `Уничтожено фишек: ${result.captures.length}`, 'warning');
-      showExplosionEffect();
-      break;
-    case 'mine_explosion':
-      showNotification('Мина!', 'Ваша фишка подорвалась на мине', 'error');
-      break;
-    case 'mine_cleared':
-            showNotification('Тральщик', 'Мина успешно обезврежена', 'success');
-      break;
-    case 'tanker_explosion':
-      showNotification('Танкер взорвался!', 'Обе фишки уничтожены', 'warning');
-      break;
-    case 'static_mine_explosion':
-      showNotification('Стационарная мина!', 'Фишка уничтожена', 'error');
-      break;
-    case 'draw':
-      showNotification('Ничья', 'Силы равны, фишки обменялись', 'info');
-      break;
-    case 'mutual_destruction':
-      showNotification('Взаимное уничтожение', 'Обе фишки уничтожены', 'warning');
-      break;
-    default:
-      showHint('Ход выполнен. Ход противника');
-  }
-}
-
-function showExplosionEffect() {
-  const explosion = document.createElement('div');
-  explosion.className = 'explosion-effect';
-  document.body.appendChild(explosion);
-  
-  setTimeout(() => {
-    explosion.remove();
-  }, 800);
+  App.game.selectedShip = type;
+  clearSelection();
+  showHint(`Выбран ${type}. Кликните на клетку в своей зоне для размещения`);
 }
 
 function checkAllShipsPlaced() {
@@ -1433,7 +1650,6 @@ function checkAllShipsPlaced() {
     }, 500);
   }
 }
-
 async function clearSetup() {
   try {
     const res = await api(`/game/clear_setup/${App.game.id}/`, 'POST', {});
@@ -1441,7 +1657,7 @@ async function clearSetup() {
       App.game.state = res.state;
       initializeShipCounts();
       updateShipCounts();
-      renderGame();
+      renderGameStatic();
       App.game.allShipsPlaced = false;
       showNotification('Успех', 'Расстановка очищена', 'success');
     }
@@ -1478,7 +1694,7 @@ async function submitSetup() {
           App.game.setupTimer = null;
         }
         createGameUI();
-        renderGame();
+        renderGameStatic();
         showNotification('Игра началась!', 'Фаза расстановки завершена', 'success');
       } else {
         if(waitOpponentModal) waitOpponentModal.style.display = 'flex';
@@ -1499,7 +1715,7 @@ async function autoSetup() {
       App.game.state = res.state;
       Object.keys(App.game.shipCounts).forEach(type => App.game.shipCounts[type] = 0);
       updateShipCounts();
-      renderGame();
+      renderGameStatic();
       showNotification('Успех', 'Автоматическая расстановка завершена', 'success');
       App.game.allShipsPlaced = true;
       checkAllShipsPlaced();
@@ -1530,7 +1746,7 @@ function updateShipCounts() {
       if(App.game.setupPhase) {
         count = App.game.shipCounts[type] || 0;
       } else {
-        count = SHIP_TYPES[type].count;
+        count = 0;
       }
       
       item.innerHTML = `${type} (${count})`;
@@ -1568,9 +1784,13 @@ function fitBoard(){
   let cellSize;
   
   if(window.innerWidth <= 600) {
-    cellSize = Math.floor(Math.min(r.width/14, r.height/15) * 0.95);
+    const availableWidth = r.width - 32;
+    const availableHeight = r.height - 32;
+    const cellSizeByWidth = Math.floor(availableWidth / 14);
+    const cellSizeByHeight = Math.floor(availableHeight / 15);
+    cellSize = Math.min(cellSizeByWidth, cellSizeByHeight, 25);
   } else {
-    cellSize = Math.floor(Math.min(r.width/14, r.height/15) * 0.98);
+    cellSize = Math.floor(Math.min(r.width/14, r.height/15) * 0.95);
   }
   
   const boardWidth = cellSize * 14;
@@ -1582,10 +1802,15 @@ function fitBoard(){
   board.style.top = '50%';
   board.style.transform = 'translate(-50%, -50%)';
   
-  board.classList.remove('player1', 'player2');
-  
   board.querySelectorAll('.piece').forEach(p => {
-    p.style.fontSize = Math.max(8, Math.floor(cellSize * 0.45)) + 'px';
+    let fontSize = Math.max(8, Math.floor(cellSize * 0.35));
+    
+    const textLength = p.textContent.length;
+    if(textLength > 2) {
+      fontSize = Math.max(6, Math.floor(cellSize * 0.25));
+    }
+    
+    p.style.fontSize = fontSize + 'px';
   });
 }
 
@@ -1690,7 +1915,7 @@ function hidePauseOverlay() {
 }
 
 function openPauseModal() {
-  if(App.game.state && App.game.state.turn !== App.game.myPlayer) {
+  if(!App.game.isMyTurn) {
     showNotification('Ошибка', 'Пауза доступна только в свой ход', 'error');
     return;
   }
@@ -1744,7 +1969,7 @@ function openResignModal() {
       <h3 class="modalTitle">Подтверждение</h3>
       <p style="text-align:center;margin:1rem 0;">Вы уверены, что хотите сдаться? Это будет засчитано как поражение.</p>
       <div class="btnRow">
-                <button id="confirmResignBtn" class="menuButs xs danger">Сдаться</button>
+        <button id="confirmResignBtn" class="menuButs xs danger">Сдаться</button>
         <button id="cancelResignBtn" class="menuButs xs">Отмена</button>
       </div>
     </div>`;
@@ -1771,6 +1996,7 @@ async function resignGame() {
       showNotification('Игра завершена', 'Вы сдались', 'info');
       if(res.state) {
         App.game.state = res.state;
+        App.game.gameFinished = true;
         showGameResult(3 - App.game.myPlayer, 'resign');
       }
     }
@@ -1780,10 +2006,8 @@ async function resignGame() {
 }
 
 function showGameResult(winner, reason) {
-  if(App.game.pollTimer) {
-    clearInterval(App.game.pollTimer);
-    App.game.pollTimer = null;
-  }
+  stopGamePolling();
+  App.game.gameFinished = true;
   
   const isWinner = (winner === App.game.myPlayer);
   
@@ -1843,11 +2067,16 @@ async function startGameByRoomUrl(url) {
     App.game.specialAttacks = null;
     App.game.carriedPieces = [];
     App.game.moveSelectionActive = false;
+    App.game.selectionLocked = false;
+    App.game.isMyTurn = (gameData.state.turn === gameData.my_player);
+    App.game.gameFinished = false;
+    App.game.pauseActive = false;
+    App.game.pollingStopped = false;
     
     initializeShipCounts();
     showContent('game');
     createGameUI();
-    renderGame();
+    renderGameStatic();
     startGamePolling();
     
     if(App.game.setupPhase) {

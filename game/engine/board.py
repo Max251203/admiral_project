@@ -21,8 +21,6 @@ class GameData:
     win_reason: str = ""
     setup_counts: Dict[int, Dict[str, int]] = field(default_factory=lambda: {1: {}, 2: {}})
     last_move: Optional[Dict] = None
-    turn_start_time: Optional[float] = None
-    bank_time_used: Dict[int, float] = field(default_factory=lambda: {1: 0.0, 2: 0.0})
 
 class Engine:
     def __init__(self, data: dict = None):
@@ -46,9 +44,7 @@ class Engine:
                 winner=data.get("winner"),
                 win_reason=data.get("win_reason", ""),
                 setup_counts=data.get("setup_counts", {1: {}, 2: {}}),
-                last_move=data.get("last_move"),
-                turn_start_time=data.get("turn_start_time"),
-                bank_time_used=data.get("bank_time_used", {1: 0.0, 2: 0.0})
+                last_move=data.get("last_move")
             )
         else:
             self.gd = GameData()
@@ -70,8 +66,6 @@ class Engine:
             "win_reason": self.gd.win_reason,
             "setup_counts": self.gd.setup_counts,
             "last_move": self.gd.last_move,
-            "turn_start_time": self.gd.turn_start_time,
-            "bank_time_used": self.gd.bank_time_used,
             "board": board_data
         }
 
@@ -100,6 +94,7 @@ class Engine:
         return [(x+1, y), (x-1, y), (x, y+1), (x, y-1)]
 
     def _find_group(self, coord: Coord, ship_type: str, owner: int) -> List[Coord]:
+        """Находит группу из одинаковых фишек, стоящих рядом"""
         visited = set()
         group = []
         stack = [coord]
@@ -113,21 +108,24 @@ class Engine:
             piece = self._get_piece(current)
             if piece and piece.owner == owner and piece.kind == ship_type and piece.alive:
                 group.append(current)
+                # Добавляем соседние клетки для поиска
                 for adj in self._get_adjacent_coords(current):
-                    if adj not in visited:
+                    if adj not in visited and self._in_bounds(adj):
                         stack.append(adj)
         
-        return group[:3]
+        return group[:3]  # Максимум 3 фишки в группе
 
     def _calculate_group_strength(self, coords: List[Coord]) -> int:
+        """Вычисляет общую силу группы"""
         total = 0
-        for coord in coords:
+        for  coord in coords:
             piece = self._get_piece(coord)
             if piece and piece.alive:
                 total += get_ship_rank(piece.kind)
         return total
 
     def _resolve_combat(self, attacker_coords: List[Coord], defender_coords: List[Coord]) -> str:
+        """Разрешает бой между группами согласно правилам"""
         if not attacker_coords or not defender_coords:
             return "invalid"
         
@@ -137,13 +135,14 @@ class Engine:
         if not attacker_piece or not defender_piece:
             return "invalid"
 
-        # Специальные правила уничтожения
+        # Специальные правила уничтожения (ПЛ vs БДК/А, КРПЛ vs КР)
         if len(attacker_coords) == 1 and len(defender_coords) == 1:
             if is_special_kill(attacker_piece.kind, defender_piece.kind):
                 return "attacker_wins"
             if is_special_kill(defender_piece.kind, attacker_piece.kind):
-                return "mutual_destruction"
+                return "defender_wins"
 
+        # Сравнение сил групп
         attacker_strength = self._calculate_group_strength(attacker_coords)
         defender_strength = self._calculate_group_strength(defender_coords)
 
@@ -155,6 +154,7 @@ class Engine:
             return "draw"
 
     def _remove_pieces(self, coords: List[Coord]) -> List[str]:
+        """Удаляет фишки с поля и возвращает их типы"""
         removed = []
         for coord in coords:
             piece = self._get_piece(coord)
@@ -164,6 +164,7 @@ class Engine:
         return removed
 
     def _explode_ab(self, center: Coord) -> List[str]:
+        """Взрыв атомной бомбы в радиусе 5x5"""
         destroyed = []
         cx, cy = center
         
@@ -183,6 +184,7 @@ class Engine:
         return destroyed
 
     def _check_victory_conditions(self):
+        """Проверяет условия победы"""
         vmb_count = {1: 0, 2: 0}
         mobile_count = {1: 0, 2: 0}
         
@@ -195,11 +197,13 @@ class Engine:
         
         for player in [1, 2]:
             opponent = 3 - player
+            # Победа при уничтожении 2 ВМБ
             if vmb_count[opponent] < 2:
                 self.gd.winner = player
                 self.gd.win_reason = "bases_destroyed"
                 self.gd.phase = "FINISHED"
                 return
+            # Победа при уничтожении всех подвижных фишек
             if mobile_count[opponent] == 0:
                 self.gd.winner = player
                 self.gd.win_reason = "no_mobile_pieces"
@@ -207,6 +211,7 @@ class Engine:
                 return
 
     def _advance_turn(self):
+        """Переход хода к следующему игроку"""
         self.gd.turn = 3 - self.gd.turn
         if self.gd.phase in ("TURN_P1", "TURN_P2"):
             self.gd.phase = f"TURN_P{self.gd.turn}"
@@ -220,24 +225,24 @@ class Engine:
 
     def _move_carried_pieces(self, carrier_coord: Coord, new_carrier_coord: Coord, carried_type: str, owner: int):
         """Перемещает переносимые фишки вслед за носителем"""
-        # Находим все переносимые фишки рядом со старой позицией
         carried_pieces = []
         for adj_coord in self._get_adjacent_coords(carrier_coord):
             piece = self._get_piece(adj_coord)
             if piece and piece.owner == owner and piece.kind == carried_type:
                 carried_pieces.append(adj_coord)
         
-        # Перемещаем их к новой позиции носителя
+        # Размещаем переносимые фишки вокруг новой позиции носителя
         new_positions = self._get_adjacent_coords(new_carrier_coord)
         for i, old_coord in enumerate(carried_pieces):
             if i < len(new_positions):
                 new_coord = new_positions[i]
-                if not self._get_piece(new_coord):  # Если клетка свободна
+                if not self._get_piece(new_coord) and self._in_bounds(new_coord):
                     piece = self._get_piece(old_coord)
                     self._set_piece(old_coord, None)
                     self._set_piece(new_coord, piece)
 
     def place_ship(self, owner: int, coord: Coord, ship_type: str):
+        """Размещение фишки в фазе расстановки"""
         if self.gd.phase != "SETUP":
             raise ValueError("Not in setup phase")
         
@@ -260,11 +265,12 @@ class Engine:
             raise ValueError(f"Maximum {ship_type} ships already placed")
         
         piece = Piece(owner=owner, kind=ship_type)
-        piece.visible_to.add(owner)  # Игрок всегда видит свои фишки
+        piece.visible_to.add(owner)  # Игрок видит свои фишки
         self._set_piece(coord, piece)
         self.gd.setup_counts[owner][ship_type] = current_count + 1
 
     def move_piece(self, owner: int, src: Coord, dst: Coord, followers: List[Tuple[Coord, Coord]] = None) -> dict:
+        """Основная функция хода с полной логикой атак и групп"""
         if self.gd.phase not in ("TURN_P1", "TURN_P2"):
             raise ValueError("Not in game phase")
         
@@ -281,14 +287,16 @@ class Engine:
         if is_immobile(piece.kind):
             raise ValueError("Piece cannot move")
         
-        # Проверка дистанции
+        # Проверка дистанции движения
         dx, dy = dst[0] - src[0], dst[1] - src[1]
         distance = abs(dx) + abs(dy)
         
         if piece.kind == "TK":
+            # ТК может ходить на 1-2 клетки прямо
             if distance not in [1, 2] or (distance == 2 and dx != 0 and dy != 0):
                 raise ValueError("Invalid TK movement")
         else:
+            # Остальные фишки ходят на 1 клетку
             if distance != 1:
                 raise ValueError("Invalid movement distance")
         
@@ -299,13 +307,14 @@ class Engine:
             if target_piece.owner == owner:
                 raise ValueError("Cannot move to occupied friendly cell")
             
-            # Столкновение - делаем фишки видимыми друг для друга
+            # СТОЛКНОВЕНИЕ - НАЧИНАЕТСЯ АТАКА
+            # Делаем фишки видимыми друг для друга
             self._make_pieces_visible([src], 3 - owner)
             self._make_pieces_visible([dst], owner)
             
             result.update(self._handle_combat(src, dst))
         else:
-            # Обычное перемещение
+            # Обычное перемещение без столкновения
             self._set_piece(dst, piece)
             self._set_piece(src, None)
             
@@ -318,7 +327,10 @@ class Engine:
             if followers:
                 self._move_followers(dst, followers, owner)
         
+        # Проверяем условия победы
         self._check_victory_conditions()
+        
+        # Переходим к следующему ходу если игра не закончена
         if self.gd.winner is None:
             self._advance_turn()
         
@@ -326,20 +338,23 @@ class Engine:
         return result
 
     def _handle_combat(self, attacker_coord: Coord, defender_coord: Coord) -> dict:
+        """Обработка всех видов боя согласно правилам"""
         attacker_piece = self._get_piece(attacker_coord)
         defender_piece = self._get_piece(defender_coord)
         
         result = {"event": "combat", "captures": [], "destroyed_own": []}
         
-        # Взрыв атомной бомбы
+        # ВЗРЫВЧАТЫЕ ВЕЩЕСТВА
+        
+        # Атомная бомба - взрывается при любом контакте
         if attacker_piece.kind == "AB" or defender_piece.kind == "AB":
             explosion_center = defender_coord if defender_piece.kind == "AB" else attacker_coord
             destroyed = self._explode_ab(explosion_center)
-            result["event"] = "explosion"
+            result["event"] = "atomic_explosion"
             result["captures"] = destroyed
             return result
         
-        # Взрыв танкера
+        # Танкер - взрывается при любом контакте
         if defender_piece.kind == "TN" or attacker_piece.kind == "TN":
             result["event"] = "tanker_explosion"
             result["captures"] = [defender_piece.kind]
@@ -348,56 +363,63 @@ class Engine:
             self._set_piece(defender_coord, None)
             return result
         
-        # Мина
+        # Мина - взрывается при атаке (кроме тральщика)
         if defender_piece.kind == "M":
             if attacker_piece.kind == "TR":
+                # Тральщик обезвреживает мину
                 result["event"] = "mine_cleared"
                 result["captures"] = [defender_piece.kind]
-                self._set_piece(defender_coord, None)
+                self._set_piece(defender_coord, attacker_piece)
+                self._set_piece(attacker_coord, None)
                 return result
             else:
+                # Мина взрывается, уничтожая атакующего
                 result["event"] = "mine_explosion"
                 result["destroyed_own"] = [attacker_piece.kind]
                 self._set_piece(attacker_coord, None)
                 return result
         
-        # Стационарная мина
+        # Стационарная мина - уничтожает любого атакующего
         if defender_piece.kind == "SM":
             result["event"] = "static_mine_explosion"
             result["destroyed_own"] = [attacker_piece.kind]
             self._set_piece(attacker_coord, None)
             return result
         
-        # Обычный бой
+        # ОБЫЧНЫЙ БОЙ МЕЖДУ ГРУППАМИ
+        
+        # Находим группы атакующего и защищающегося
         attacker_group = self._find_group(attacker_coord, attacker_piece.kind, attacker_piece.owner)
         defender_group = self._find_group(defender_coord, defender_piece.kind, defender_piece.owner)
         
-        # Делаем группы видимыми
+        # Делаем все фишки в группах видимыми для противников
         self._make_pieces_visible(attacker_group, 3 - attacker_piece.owner)
         self._make_pieces_visible(defender_group, attacker_piece.owner)
         
+        # Разрешаем бой
         combat_result = self._resolve_combat(attacker_group, defender_group)
         
         if combat_result == "attacker_wins":
+            # Атакующий побеждает
             result["captures"] = self._remove_pieces(defender_group)
+            # Перемещаем атакующую фишку на место защищающегося
             self._set_piece(defender_coord, attacker_piece)
             self._set_piece(attacker_coord, None)
+            
         elif combat_result == "defender_wins":
+            # Защищающийся побеждает
             result["destroyed_own"] = self._remove_pieces(attacker_group)
+            
         elif combat_result == "draw":
+            # Ничья - обе группы уничтожаются
             result["event"] = "draw"
             result["captures"] = self._remove_pieces(defender_group)
             result["destroyed_own"] = self._remove_pieces(attacker_group)
-        elif combat_result == "mutual_destruction":
-            result["event"] = "mutual_destruction"
-            result["captures"] = [defender_piece.kind]
-            result["destroyed_own"] = [attacker_piece.kind]
-            self._set_piece(attacker_coord, None)
-            self._set_piece(defender_coord, None)
         
         return result
 
     def _move_followers(self, leader_pos: Coord, followers: List[Tuple[Coord, Coord]], owner: int):
+        """Перемещение фишек-последователей в группе"""
         for src, dst in followers:
             if not self._in_bounds(src) or not self._in_bounds(dst):
                 continue
@@ -406,15 +428,18 @@ class Engine:
             if not piece or piece.owner != owner:
                 continue
             
+            # Проверяем, что новая позиция рядом с лидером
             distance_to_leader = abs(dst[0] - leader_pos[0]) + abs(dst[1] - leader_pos[1])
             if distance_to_leader != 1:
                 continue
             
+            # Перемещаем если клетка свободна
             if not self._get_piece(dst):
                 self._set_piece(dst, piece)
                 self._set_piece(src, None)
 
     def torpedo_attack(self, owner: int, torpedo_coord: Coord, tk_coord: Coord, direction: Coord) -> dict:
+        """Торпедная атака"""
         if self.gd.phase not in ("TURN_P1", "TURN_P2"):
             raise ValueError("Not in game phase")
         
@@ -430,6 +455,7 @@ class Engine:
         if torpedo.kind != "T" or tk.kind != "TK":
             raise ValueError("Wrong piece types")
         
+        # Торпеда должна быть рядом с ТК
         distance = abs(torpedo_coord[0] - tk_coord[0]) + abs(torpedo_coord[1] - tk_coord[1])
         if distance != 1:
             raise ValueError("Torpedo must be adjacent to TK")
@@ -438,15 +464,16 @@ class Engine:
         if abs(dx) + abs(dy) != 1:
             raise ValueError("Invalid direction")
         
-        # Нельзя стрелять назад
+        # Нельзя стрелять назад (в сторону ТК)
         back_direction = (tk_coord[0] - torpedo_coord[0], tk_coord[1] - torpedo_coord[1])
         if (dx, dy) == back_direction:
             raise ValueError("Cannot shoot backwards")
         
         result = {"event": "torpedo_attack", "captures": []}
         
+        # Стреляем до первого препятствия (максимум 7 клеток)
         x, y = torpedo_coord
-        while True:
+        for _ in range(7):
             x += dx
             y += dy
             coord = (x, y)
@@ -456,12 +483,13 @@ class Engine:
             
             piece = self._get_piece(coord)
             if piece:
-                # Делаем цель видимой
+                # Попадание - делаем цель видимой и уничтожаем
                 self._make_pieces_visible([coord], owner)
                 result["captures"].append(piece.kind)
                 self._set_piece(coord, None)
                 break
         
+        # Торпеда расходуется
         self._set_piece(torpedo_coord, None)
         
         self._check_victory_conditions()
@@ -472,6 +500,7 @@ class Engine:
         return result
 
     def air_attack(self, owner: int, carrier_coord: Coord, plane_coord: Coord) -> dict:
+        """Воздушная атака"""
         if self.gd.phase not in ("TURN_P1", "TURN_P2"):
             raise ValueError("Not in game phase")
         
@@ -488,7 +517,7 @@ class Engine:
             raise ValueError("Wrong piece types")
         
         # Самолет должен быть впереди авианосца
-        direction = 1 if owner == 2 else -1
+        direction = 1 if owner == 2 else -1  # Игрок 2 атакует вверх, игрок 1 - вниз
         expected_plane_pos = (carrier_coord[0], carrier_coord[1] + direction)
         
         if plane_coord != expected_plane_pos:
@@ -496,6 +525,7 @@ class Engine:
         
         result = {"event": "air_attack", "captures": []}
         
+        # Атакуем 5 клеток вперед от самолета
         x, y = plane_coord
         for _ in range(5):
             y += direction
@@ -506,11 +536,12 @@ class Engine:
             
             piece = self._get_piece(coord)
             if piece:
-                # Делаем цель видимой
+                # Уничтожаем все на пути (включая свои фишки)
                 self._make_pieces_visible([coord], owner)
                 result["captures"].append(piece.kind)
                 self._set_piece(coord, None)
         
+        # Самолет расходуется
         self._set_piece(plane_coord, None)
         
         self._check_victory_conditions()
@@ -521,6 +552,7 @@ class Engine:
         return result
 
     def detonate_bomb(self, owner: int, bomb_coord: Coord) -> dict:
+        """Подрыв атомной бомбы"""
         if self.gd.phase not in ("TURN_P1", "TURN_P2"):
             raise ValueError("Not in game phase")
         
@@ -543,20 +575,24 @@ class Engine:
         return result
 
     def auto_setup(self, owner: int) -> int:
-        """Логичная авторасстановка"""
+        """Автоматическая расстановка флота"""
         if self.gd.phase != "SETUP":
             raise ValueError("Not in setup phase")
         
         # Очищаем старую расстановку
-        for coord in list(self.gd.board.keys()):
-            piece = self.gd.board[coord]
+        coords_to_remove = []
+        for coord, piece in self.gd.board.items():
             if piece.owner == owner:
-                del self.gd.board[coord]
+                coords_to_remove.append(coord)
+        
+        for coord in coords_to_remove:
+            del self.gd.board[coord]
         
         if owner not in self.gd.setup_counts:
             self.gd.setup_counts[owner] = {}
         self.gd.setup_counts[owner] = {}
         
+        # Определяем зону расстановки
         rows = list(range(10, 15)) if owner == 1 else list(range(0, 5))
         cols = list(range(0, 14))
         
@@ -612,50 +648,27 @@ class Engine:
             if s_y in rows:
                 place_ship_at(a_pos[0], s_y, "S")
         
-        # 4. Размещаем группы однотипных кораблей
-        group_ships = ["BDK", "L", "KR", "F", "ST", "TR"]
+        # 4. Размещаем остальные фишки случайно
+        remaining_ships = []
+        for ship_type, data in SHIP_TYPES.items():
+            if ship_type not in ["VMB", "AB", "SM", "ES", "M", "TK", "T", "A", "S"]:
+                for _ in range(data["count"]):
+                    remaining_ships.append(ship_type)
+        
+        random.shuffle(remaining_ships)
         available_positions = [(x, y) for x in cols for y in rows if (x, y) not in used_positions]
         random.shuffle(available_positions)
         
-        pos_idx = 0
-        for ship_type in group_ships:
-            count = SHIP_TYPES[ship_type]["count"]
-            # Размещаем группами по 2-3 корабля рядом
-            groups = []
-            for i in range(0, count, 3):
-                group_size = min(3, count - i)
-                groups.append(group_size)
-            
-            for group_size in groups:
-                if pos_idx < len(available_positions):
-                    start_pos = available_positions[pos_idx]
-                    placed_in_group = 0
-                    
-                    # Пытаемся разместить группу компактно
-                    for dx in range(-1, 2):
-                        for dy in range(-1, 2):
-                            if placed_in_group >= group_size:
-                                break
-                            x, y = start_pos[0] + dx, start_pos[1] + dy
-                            if place_ship_at(x, y, ship_type):
-                                placed_in_group += 1
-                        if placed_in_group >= group_size:
-                            break
-                    
-                    pos_idx += 10  # Пропускаем позиции для следующей группы
-        
-        # 5. Размещаем оставшиеся фишки
-        remaining_ships = ["PL", "KRPL", "TN"]
         for ship_type in remaining_ships:
-            count = SHIP_TYPES[ship_type]["count"]
-            for _ in range(count):
-                for x, y in available_positions:
-                    if place_ship_at(x, y, ship_type):
-                        break
+            for pos in available_positions:
+                if place_ship_at(pos[0], pos[1], ship_type):
+                    available_positions.remove(pos)
+                    break
         
         return placed_count
 
     def clear_setup(self, owner: int):
+        """Очистка расстановки"""
         if self.gd.phase != "SETUP":
             raise ValueError("Not in setup phase")
         
@@ -690,13 +703,33 @@ class Engine:
             return []
         
         candidates = []
+        visited = set([coord])
+        
+        # Ищем соседние фишки того же типа
         for adj_coord in self._get_adjacent_coords(coord):
+            if adj_coord in visited or not self._in_bounds(adj_coord):
+                continue
+                
             adj_piece = self._get_piece(adj_coord)
             if (adj_piece and adj_piece.owner == owner and 
                 adj_piece.kind == piece.kind and adj_piece.alive):
                 candidates.append(adj_coord)
+                visited.add(adj_coord)
+                
+                # Ищем фишки рядом с найденными (для группы из 3)
+                if len(candidates) < 2:
+                    for adj2_coord in self._get_adjacent_coords(adj_coord):
+                        if (adj2_coord in visited or not self._in_bounds(adj2_coord) or 
+                            len(candidates) >= 2):
+                            continue
+                            
+                        adj2_piece = self._get_piece(adj2_coord)
+                        if (adj2_piece and adj2_piece.owner == owner and 
+                            adj2_piece.kind == piece.kind and adj2_piece.alive):
+                            candidates.append(adj2_coord)
+                            visited.add(adj2_coord)
         
-        return candidates[:2]  # Максимум 2 дополнительные фишки (всего 3 в группе)
+        return candidates[:2]  # Максимум 2 дополнительные фишки
 
     def get_special_attack_options(self, owner: int) -> dict:
         """Возвращает доступные специальные атаки"""
@@ -717,7 +750,7 @@ class Engine:
                         adj_piece.kind == "T" and adj_piece.alive):
                         # Определяем возможные направления стрельбы
                         directions = []
-                        for dx, dy in [(1,0), (-1,0), (0,1), (0,-1), (1,1), (-1,-1), (1,-1), (-1,1)]:
+                        for dx, dy in [(1,0), (-1,0), (0,1), (0,-1)]:
                             # Проверяем, что направление не назад от торпеды к ТК
                             torpedo_to_tk = (coord[0] - adj_coord[0], coord[1] - adj_coord[1])
                             if (dx, dy) != torpedo_to_tk:

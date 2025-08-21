@@ -21,22 +21,34 @@ SHIP_TYPES = {
     "VMB": {"count": 2, "rank": 1, "name": "ВМБ"},
 }
 
+# Неподвижные фишки
 IMMOBILE_TYPES = {"VMB", "SM"}
+
+# Носители и их груз
 CARRIER_TYPES = {"ES": "M", "TK": "T", "A": "S"}
+
+# Специальные правила уничтожения
 SPECIAL_KILLS = {("PL", "BDK"), ("PL", "A"), ("KRPL", "KR")}
+
+# Взрывчатые фишки
 EXPLOSIVE_TYPES = {"AB", "TN", "M", "SM"}
 
 def get_ship_rank(ship_type):
+    """Возвращает ранг (силу) фишки"""
     return SHIP_TYPES.get(ship_type, {}).get("rank", 0)
 
 def is_immobile(ship_type):
+    """Проверяет, является ли фишка неподвижной"""
     return ship_type in IMMOBILE_TYPES
 
 def can_carry(carrier_type):
+    """Возвращает тип фишки, которую может переносить носитель"""
     return CARRIER_TYPES.get(carrier_type)
 
 def is_special_kill(attacker, defender):
+    """Проверяет специальные правила уничтожения"""
     return (attacker, defender) in SPECIAL_KILLS
 
 def is_explosive(ship_type):
+    """Проверяет, является ли фишка взрывчатой"""
     return ship_type in EXPLOSIVE_TYPES
