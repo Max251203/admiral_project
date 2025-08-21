@@ -6,6 +6,8 @@ from django.db import models
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 
 from ..models import Game, GameState, Move, KilledCounter
 from ..engine.board import Engine
@@ -51,6 +53,29 @@ def _persist_after_engine(game: Game, st: GameState, eng: Engine):
     
     game.save()
 
+def broadcast_game_state(game: Game):
+    st, _ = GameState.objects.get_or_create(game=game)
+    channel_layer = get_channel_layer()
+
+    for player_id, player_num in [(game.player1_id, 1), (game.player2_id, 2)]:
+        if player_id:
+            eng = Engine(st.data)
+            visible_board = eng.get_visible_board_for_player(player_num)
+            
+            payload = {
+                "type": "game_state_update",
+                "game_id": str(game.id),
+                "state": {**st.data, "board": visible_board},
+                "status": game.status,
+                "turn": game.turn,
+                "my_player": player_num,
+            }
+            
+            async_to_sync(channel_layer.group_send)(
+                f"game_{game.id}",
+                {"type": "broadcast_message", "payload": payload}
+            )
+
 class GetState(APIView):
     permission_classes = [IsAuthenticated]
     
@@ -68,10 +93,7 @@ class GetState(APIView):
             
             return Response({
                 "game": str(g.id),
-                "state": {
-                    **st.data,
-                    "board": visible_board
-                },
+                "state": {**st.data, "board": visible_board},
                 "status": g.status,
                 "turn": g.turn,
                 "my_player": my_player
@@ -109,17 +131,57 @@ class SetupAPI(APIView):
             
             _persist_after_engine(g, st, eng)
             Move.objects.create(
-                game=g,
-                number=g.moves.count() + 1,
-                actor=me,
-                type="setup",
-                payload={"count": len(placements)}
+                game=g, number=g.moves.count() + 1, actor=me,
+                type="setup", payload={"count": len(placements)}
             )
             
-            visible_board = eng.get_visible_board_for_player(me)
-            return Response({"ok": True, "state": {**st.data, "board": visible_board}})
+            broadcast_game_state(g)
+            return Response({"ok": True})
         except ValueError as e:
             return Response({"error": str(e)}, status=400)
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+
+class SubmitSetup(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, game_id):
+        try:
+            g = get_object_or_404(Game, id=game_id)
+            if g.player1_id != request.user.id and g.player2_id != request.user.id:
+                return Response({"error": "not your game"}, status=403)
+            
+            st = _ensure_state(g)
+            now = timezone.now()
+            me = _actor(g, request.user)
+            
+            if me == 1 and not g.ready_p1:
+                g.ready_p1 = True
+                g.ready_at_p1 = now
+            elif me == 2 and not g.ready_p2:
+                g.ready_p2 = True
+                g.ready_at_p2 = now
+            
+            g.save()
+            
+            if g.ready_p1 and g.ready_p2 and g.status == "SETUP":
+                if g.ready_at_p1 <= g.ready_at_p2:
+                    g.status = "TURN_P1"
+                    g.turn = 1
+                    g.turn_start_time_p1 = time.time()
+                else:
+                    g.status = "TURN_P2"
+                    g.turn = 2
+                    g.turn_start_time_p2 = time.time()
+                
+                g.turn_start_time = time.time()
+                st.data["phase"] = g.status
+                st.data["turn"] = g.turn
+                g.save()
+                st.save()
+            
+            broadcast_game_state(g)
+            return Response({"ok": True, "status": g.status, "turn": g.turn})
         except Exception as e:
             return Response({"error": str(e)}, status=500)
 
@@ -166,11 +228,8 @@ class MoveAPI(APIView):
                     )
             
             Move.objects.create(
-                game=g,
-                number=g.moves.count() + 1,
-                actor=me,
-                type="move",
-                payload={**request.data, **result}
+                game=g, number=g.moves.count() + 1, actor=me,
+                type="move", payload={**request.data, **result}
             )
             
             if st.data.get("winner"):
@@ -195,10 +254,179 @@ class MoveAPI(APIView):
                     loser.profile.rating_elo = max(0, loser.profile.rating_elo - 100)
                     loser.profile.save()
             
-            visible_board = eng.get_visible_board_for_player(me)
-            return Response({"ok": True, "result": result, "state": {**st.data, "board": visible_board}})
+            broadcast_game_state(g)
+            return Response({"ok": True, "result": result})
         except ValueError as e:
             return Response({"error": str(e)}, status=400)
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+
+class AutoSetup(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, game_id):
+        try:
+            g = get_object_or_404(Game, id=game_id)
+            if g.player1_id != request.user.id and g.player2_id != request.user.id:
+                return Response({"error": "not your game"}, status=403)
+            
+            st = _ensure_state(g)
+            eng = Engine(st.data)
+            me = _actor(g, request.user)
+            
+            placed = eng.auto_setup(me)
+            _persist_after_engine(g, st, eng)
+            
+            Move.objects.create(
+                game=g, number=g.moves.count() + 1, actor=me,
+                type="auto_setup", payload={"count": placed}
+            )
+            
+            broadcast_game_state(g)
+            return Response({"ok": True, "placed": placed})
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+
+class ClearSetup(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, game_id):
+        try:
+            g = get_object_or_404(Game, id=game_id)
+            if g.player1_id != request.user.id and g.player2_id != request.user.id:
+                return Response({"error": "not your game"}, status=403)
+            
+            st = _ensure_state(g)
+            eng = Engine(st.data)
+            me = _actor(g, request.user)
+            
+            eng.clear_setup(me)
+            _persist_after_engine(g, st, eng)
+            
+            if me == 1:
+                g.ready_p1 = False
+            else:
+                g.ready_p2 = False
+            g.save(update_fields=["ready_p1", "ready_p2"])
+            
+            Move.objects.create(
+                game=g, number=g.moves.count() + 1, actor=me,
+                type="setup_clear", payload={}
+            )
+            
+            broadcast_game_state(g)
+            return Response({"ok": True})
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+
+class TorpedoAPI(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, game_id):
+        try:
+            g = get_object_or_404(Game, id=game_id)
+            if g.player1_id != request.user.id and g.player2_id != request.user.id:
+                return Response({"error": "not your game"}, status=403)
+            
+            st = _ensure_state(g)
+            eng = Engine(st.data)
+            me = _actor(g, request.user)
+            
+            torpedo_coord = tuple(request.data["torpedo"])
+            tk_coord = tuple(request.data["tk"])
+            direction = tuple(request.data["direction"])
+            
+            result = eng.torpedo_attack(me, torpedo_coord, tk_coord, direction)
+            
+            _persist_after_engine(g, st, eng)
+            
+            if "captures" in result and result["captures"]:
+                for kind in result["captures"]:
+                    KilledCounter.objects.update_or_create(
+                        game=g, owner=3-me, piece=kind,
+                        defaults={"killed": models.F("killed") + 1}
+                    )
+            
+            Move.objects.create(
+                game=g, number=g.moves.count() + 1, actor=me,
+                type="torpedo", payload={**request.data, **result}
+            )
+            
+            broadcast_game_state(g)
+            return Response({"ok": True, "result": result})
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+
+class AirAPI(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, game_id):
+        try:
+            g = get_object_or_404(Game, id=game_id)
+            if g.player1_id != request.user.id and g.player2_id != request.user.id:
+                return Response({"error": "not your game"}, status=403)
+            
+            st = _ensure_state(g)
+            eng = Engine(st.data)
+            me = _actor(g, request.user)
+            
+            carrier_coord = tuple(request.data["carrier"])
+            plane_coord = tuple(request.data["plane"])
+            
+            result = eng.air_attack(me, carrier_coord, plane_coord)
+            
+            _persist_after_engine(g, st, eng)
+            
+            if "captures" in result and result["captures"]:
+                for kind in result["captures"]:
+                    KilledCounter.objects.update_or_create(
+                        game=g, owner=3-me, piece=kind,
+                        defaults={"killed": models.F("killed") + 1}
+                    )
+            
+            Move.objects.create(
+                game=g, number=g.moves.count() + 1, actor=me,
+                type="air_attack", payload={**request.data, **result}
+            )
+            
+            broadcast_game_state(g)
+            return Response({"ok": True, "result": result})
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+
+class BombAPI(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, game_id):
+        try:
+            g = get_object_or_404(Game, id=game_id)
+            if g.player1_id != request.user.id and g.player2_id != request.user.id:
+                return Response({"error": "not your game"}, status=403)
+            
+            st = _ensure_state(g)
+            eng = Engine(st.data)
+            me = _actor(g, request.user)
+            
+            bomb_coord = tuple(request.data["bomb"])
+            
+            result = eng.detonate_bomb(me, bomb_coord)
+            
+            _persist_after_engine(g, st, eng)
+            
+            if "captures" in result and result["captures"]:
+                for kind in result["captures"]:
+                    KilledCounter.objects.update_or_create(
+                        game=g, owner=3-me, piece=kind,
+                        defaults={"killed": models.F("killed") + 1}
+                    )
+            
+            Move.objects.create(
+                game=g, number=g.moves.count() + 1, actor=me,
+                type="atomic_bomb", payload={**request.data, **result}
+            )
+            
+            broadcast_game_state(g)
+            return Response({"ok": True, "result": result})
         except Exception as e:
             return Response({"error": str(e)}, status=500)
 
@@ -254,384 +482,12 @@ class PauseAPI(APIView):
             g.save()
             
             Move.objects.create(
-                game=g,
-                number=g.moves.count() + 1,
-                actor=me,
-                type="pause",
-                payload={"type": pause_type, "duration": pause_duration}
+                game=g, number=g.moves.count() + 1, actor=me,
+                type="pause", payload={"type": pause_type, "duration": pause_duration}
             )
             
-            return Response({
-                "ok": True,
-                "pause_until": g.pause_until.isoformat(),
-                "duration": pause_duration
-            })
-        except Exception as e:
-            return Response({"error": str(e)}, status=500)
-
-class ClearSetup(APIView):
-    permission_classes = [IsAuthenticated]
-    
-    def post(self, request, game_id):
-        try:
-            g = get_object_or_404(Game, id=game_id)
-            if g.player1_id != request.user.id and g.player2_id != request.user.id:
-                return Response({"error": "not your game"}, status=403)
-            
-            st = _ensure_state(g)
-            eng = Engine(st.data)
-            me = _actor(g, request.user)
-            
-            eng.clear_setup(me)
-            _persist_after_engine(g, st, eng)
-            
-            if me == 1:
-                g.ready_p1 = False
-            else:
-                g.ready_p2 = False
-            g.save(update_fields=["ready_p1", "ready_p2"])
-            
-            Move.objects.create(
-                game=g,
-                number=g.moves.count() + 1,
-                actor=me,
-                type="setup_clear",
-                payload={}
-            )
-            
-            visible_board = eng.get_visible_board_for_player(me)
-            return Response({"ok": True, "state": {**st.data, "board": visible_board}})
-        except Exception as e:
-            return Response({"error": str(e)}, status=500)
-
-class SubmitSetup(APIView):
-    permission_classes = [IsAuthenticated]
-    
-    def post(self, request, game_id):
-        try:
-            g = get_object_or_404(Game, id=game_id)
-            if g.player1_id != request.user.id and g.player2_id != request.user.id:
-                return Response({"error": "not your game"}, status=403)
-            
-            st = _ensure_state(g)
-            now = timezone.now()
-            me = _actor(g, request.user)
-            
-            if me == 1 and not g.ready_p1:
-                g.ready_p1 = True
-                g.ready_at_p1 = now
-            elif me == 2 and not g.ready_p2:
-                g.ready_p2 = True
-                g.ready_at_p2 = now
-            
-            g.save()
-            
-            if g.ready_p1 and g.ready_p2 and g.status == "SETUP":
-                if g.ready_at_p1 <= g.ready_at_p2:
-                    g.status = "TURN_P1"
-                    g.turn = 1
-                    g.turn_start_time_p1 = time.time()
-                else:
-                    g.status = "TURN_P2"
-                    g.turn = 2
-                    g.turn_start_time_p2 = time.time()
-                
-                g.turn_start_time = time.time()
-                st.data["phase"] = g.status
-                st.data["turn"] = g.turn
-                g.save()
-                st.save()
-            
-            return Response({"ok": True, "status": g.status, "turn": g.turn})
-        except Exception as e:
-            return Response({"error": str(e)}, status=500)
-
-class AutoSetup(APIView):
-    permission_classes = [IsAuthenticated]
-    
-    def post(self, request, game_id):
-        try:
-            g = get_object_or_404(Game, id=game_id)
-            if g.player1_id != request.user.id and g.player2_id != request.user.id:
-                return Response({"error": "not your game"}, status=403)
-            
-            st = _ensure_state(g)
-            eng = Engine(st.data)
-            me = _actor(g, request.user)
-            
-            placed = eng.auto_setup(me)
-            _persist_after_engine(g, st, eng)
-            
-            Move.objects.create(
-                game=g,
-                number=g.moves.count() + 1,
-                actor=me,
-                type="auto_setup",
-                payload={"count": placed}
-            )
-            
-            visible_board = eng.get_visible_board_for_player(me)
-            return Response({"ok": True, "state": {**st.data, "board": visible_board}, "placed": placed})
-        except Exception as e:
-            return Response({"error": str(e)}, status=500)
-
-class TorpedoAPI(APIView):
-    permission_classes = [IsAuthenticated]
-    
-    def post(self, request, game_id):
-        try:
-            g = get_object_or_404(Game, id=game_id)
-            if g.player1_id != request.user.id and g.player2_id != request.user.id:
-                return Response({"error": "not your game"}, status=403)
-            
-            st = _ensure_state(g)
-            eng = Engine(st.data)
-            me = _actor(g, request.user)
-            
-            torpedo_coord = tuple(request.data["torpedo"])
-            tk_coord = tuple(request.data["tk"])
-            direction = tuple(request.data["direction"])
-            
-            result = eng.torpedo_attack(me, torpedo_coord, tk_coord, direction)
-            
-            _persist_after_engine(g, st, eng)
-            
-            if "captures" in result and result["captures"]:
-                for kind in result["captures"]:
-                    KilledCounter.objects.update_or_create(
-                        game=g, owner=3-me, piece=kind,
-                        defaults={"killed": models.F("killed") + 1}
-                    )
-            
-            Move.objects.create(
-                game=g,
-                number=g.moves.count() + 1,
-                actor=me,
-                type="torpedo",
-                payload={**request.data, **result}
-            )
-            
-            visible_board = eng.get_visible_board_for_player(me)
-            return Response({"ok": True, "result": result, "state": {**st.data, "board": visible_board}})
-        except Exception as e:
-            return Response({"error": str(e)}, status=500)
-
-class AirAPI(APIView):
-    permission_classes = [IsAuthenticated]
-    
-    def post(self, request, game_id):
-        try:
-            g = get_object_or_404(Game, id=game_id)
-            if g.player1_id != request.user.id and g.player2_id != request.user.id:
-                return Response({"error": "not your game"}, status=403)
-            
-            st = _ensure_state(g)
-            eng = Engine(st.data)
-            me = _actor(g, request.user)
-            
-            carrier_coord = tuple(request.data["carrier"])
-            plane_coord = tuple(request.data["plane"])
-            
-            result = eng.air_attack(me, carrier_coord, plane_coord)
-            
-            _persist_after_engine(g, st, eng)
-            
-            if "captures" in result and result["captures"]:
-                for kind in result["captures"]:
-                    KilledCounter.objects.update_or_create(
-                        game=g, owner=3-me, piece=kind,
-                        defaults={"killed": models.F("killed") + 1}
-                    )
-            
-            Move.objects.create(
-                game=g,
-                number=g.moves.count() + 1,
-                actor=me,
-                type="air_attack",
-                payload={**request.data, **result}
-            )
-            
-            visible_board = eng.get_visible_board_for_player(me)
-            return Response({"ok": True, "result": result, "state": {**st.data, "board": visible_board}})
-        except Exception as e:
-            return Response({"error": str(e)}, status=500)
-
-class BombAPI(APIView):
-    permission_classes = [IsAuthenticated]
-    
-    def post(self, request, game_id):
-        try:
-            g = get_object_or_404(Game, id=game_id)
-            if g.player1_id != request.user.id and g.player2_id != request.user.id:
-                return Response({"error": "not your game"}, status=403)
-            
-            st = _ensure_state(g)
-            eng = Engine(st.data)
-            me = _actor(g, request.user)
-            
-            bomb_coord = tuple(request.data["bomb"])
-            
-            result = eng.detonate_bomb(me, bomb_coord)
-            
-            _persist_after_engine(g, st, eng)
-            
-            if "captures" in result and result["captures"]:
-                for kind in result["captures"]:
-                    KilledCounter.objects.update_or_create(
-                        game=g, owner=3-me, piece=kind,
-                        defaults={"killed": models.F("killed") + 1}
-                    )
-            
-            Move.objects.create(
-                game=g,
-                number=g.moves.count() + 1,
-                actor=me,
-                type="atomic_bomb",
-                payload={**request.data, **result}
-            )
-            
-            visible_board = eng.get_visible_board_for_player(me)
-            return Response({"ok": True, "result": result, "state": {**st.data, "board": visible_board}})
-        except Exception as e:
-            return Response({"error": str(e)}, status=500)
-
-class GameTimers(APIView):
-    permission_classes = [IsAuthenticated]
-    
-    def get(self, request, game_id):
-        try:
-            g = get_object_or_404(Game, id=game_id)
-            if g.player1_id != request.user.id and g.player2_id != request.user.id:
-                return Response({"error": "not your game"}, status=403)
-            
-            now = timezone.now()
-            current_time = time.time()
-            me = _actor(g, request.user)
-            
-            pauses_info = {
-                "short_available": not (g.short_pause_p1 if me == 1 else g.short_pause_p2),
-                "long_available": not (g.long_pause_p1 if me == 1 else g.long_pause_p2)
-            }
-            
-            if g.status == "FINISHED":
-                winner_player = 1 if (g.winner_id == g.player1_id) else (2 if g.winner_id else None)
-                return Response({
-                    "turn": g.turn,
-                    "finished": True,
-                    "winner_player": winner_player,
-                    "reason": g.win_reason,
-                    **pauses_info
-                })
-            
-            if g.status == "PAUSED" and g.pause_until:
-                if now >= g.pause_until:
-                    g.status = f"TURN_P{g.turn}"
-                    g.pause_until = None
-                    g.save()
-                else:
-                    pause_left = int((g.pause_until - now).total_seconds())
-                    return Response({
-                        "turn": g.turn,
-                        "paused": True,
-                        "pause_left": pause_left,
-                        "pause_initiator": g.pause_initiator,
-                        **pauses_info
-                    })
-            
-            if g.status not in ("TURN_P1", "TURN_P2"):
-                winner_player = 1 if (g.winner_id == g.player1_id) else (2 if g.winner_id else None)
-                return Response({
-                    "turn": g.turn,
-                    "finished": g.status == "FINISHED",
-                    "winner_player": winner_player,
-                    "reason": g.win_reason,
-                    **pauses_info
-                })
-            
-            my_turn_left = 30
-            my_bank_left = 0
-            opponent_turn_left = 30
-            opponent_bank_left = 0
-            
-            if me == 1:
-                my_bank_ms = g.bank_ms_p1
-                my_turn_start = g.turn_start_time_p1
-                my_last_bank_update = g.last_bank_update_p1
-                opponent_bank_ms = g.bank_ms_p2
-            else:
-                my_bank_ms = g.bank_ms_p2
-                my_turn_start = g.turn_start_time_p2
-                my_last_bank_update = g.last_bank_update_p2
-                opponent_bank_ms = g.bank_ms_p1
-            
-            my_bank_left = my_bank_ms // 1000
-            opponent_bank_left = opponent_bank_ms // 1000
-            
-            if g.turn == me and my_turn_start:
-                turn_elapsed = current_time - my_turn_start
-                my_turn_left = max(0, 30 - int(turn_elapsed))
-                
-                if my_turn_left == 0 and turn_elapsed > 30:
-                    if my_last_bank_update is None:
-                        my_last_bank_update = my_turn_start + 30
-                        if me == 1:
-                            g.last_bank_update_p1 = my_last_bank_update
-                        else:
-                            g.last_bank_update_p2 = my_last_bank_update
-                    
-                    seconds_since_update = current_time - my_last_bank_update
-                    
-                    if seconds_since_update >= 1.0:
-                        seconds_to_deduct = int(seconds_since_update)
-                        my_bank_ms = max(0, my_bank_ms - (seconds_to_deduct * 1000))
-                        
-                        if me == 1:
-                            g.bank_ms_p1 = my_bank_ms
-                            g.last_bank_update_p1 = current_time
-                        else:
-                            g.bank_ms_p2 = my_bank_ms
-                            g.last_bank_update_p2 = current_time
-                        
-                        my_bank_left = my_bank_ms // 1000
-                        g.save()
-                    
-                    if my_bank_left <= 0:
-                        g.status = "FINISHED"
-                        g.winner_id = g.player2_id if me == 1 else g.player1_id
-                        g.win_reason = "time"
-                        g.turn_start_time_p1 = None
-                        g.turn_start_time_p2 = None
-                        g.last_bank_update_p1 = None
-                        g.last_bank_update_p2 = None
-                        g.save()
-                        
-                        winner = g.player2 if me == 1 else g.player1
-                        loser = g.player1 if me == 1 else g.player2
-                        
-                        winner.profile.wins += 1
-                        winner.profile.rating_elo += 100
-                        winner.profile.save()
-                        
-                        loser.profile.losses += 1
-                        loser.profile.rating_elo = max(0, loser.profile.rating_elo - 100)
-                        loser.profile.save()
-                        
-                        return Response({
-                            "turn": g.turn,
-                            "finished": True,
-                            "winner": g.winner_id,
-                            "reason": "time"
-                        })
-            
-            return Response({
-                "turn": g.turn,
-                "my_turn": g.turn == me,
-                "my_turn_left": my_turn_left if g.turn == me else 30,
-                "my_bank_left": my_bank_left,
-                "opponent_turn_left": opponent_turn_left if g.turn != me else 30,
-                "opponent_bank_left": opponent_bank_left,
-                **pauses_info
-            })
+            broadcast_game_state(g)
+            return Response({"ok": True})
         except Exception as e:
             return Response({"error": str(e)}, status=500)
 
@@ -655,13 +511,11 @@ class CancelPauseAPI(APIView):
             g.save()
             
             Move.objects.create(
-                game=g,
-                number=g.moves.count() + 1,
-                actor=me,
-                type="cancel_pause",
-                payload={}
+                game=g, number=g.moves.count() + 1, actor=me,
+                type="cancel_pause", payload={}
             )
             
+            broadcast_game_state(g)
             return Response({"ok": True})
         except Exception as e:
             return Response({"error": str(e)}, status=500)
@@ -698,11 +552,8 @@ class ResignAPI(APIView):
             st.save()
             
             Move.objects.create(
-                game=g,
-                number=g.moves.count() + 1,
-                actor=me,
-                type="resign",
-                payload={}
+                game=g, number=g.moves.count() + 1, actor=me,
+                type="resign", payload={}
             )
             
             winner = g.player2 if me == 1 else g.player1
@@ -714,8 +565,8 @@ class ResignAPI(APIView):
             loser.profile.rating_elo = max(0, loser.profile.rating_elo - 100)
             loser.profile.save()
             
-            visible_board = eng.get_visible_board_for_player(me)
-            return Response({"ok": True, "state": {**st.data, "board": visible_board}})
+            broadcast_game_state(g)
+            return Response({"ok": True})
         except Exception as e:
             return Response({"error": str(e)}, status=500)
 
@@ -787,7 +638,6 @@ class KilledPieces(APIView):
             
             me = _actor(g, request.user)
             opponent = 3 - me
-            
             killed = KilledCounter.objects.filter(game=g, owner=opponent)
             items = [{"piece": k.piece, "killed": k.killed} for k in killed]
             

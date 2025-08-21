@@ -6,7 +6,6 @@ from django.views.generic import TemplateView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("admin-panel/", admin.site.urls),  # алиас, как просили
     path("", TemplateView.as_view(template_name="app.html"), name="home"),
     path("accounts/", include("accounts.urls")),
     path("game/", include("game.urls")),

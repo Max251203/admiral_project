@@ -3,7 +3,7 @@ from .views import room
 from .api.views import (
     GetState, SetupAPI, SubmitSetup, AutoSetup, ClearSetup,
     MoveAPI, TorpedoAPI, AirAPI, BombAPI, ResignAPI, PauseAPI,
-    GameByCode, MyGames, GameTimers, CancelPauseAPI, KilledPieces,
+    GameByCode, MyGames, CancelPauseAPI, KilledPieces,
     GetGroupCandidates, GetSpecialAttacks, GetCarriedPieces
 )
 
@@ -19,7 +19,6 @@ urlpatterns = [
     path("bomb/<uuid:game_id>/", BombAPI.as_view(), name="game_bomb"),
     path("resign/<uuid:game_id>/", ResignAPI.as_view(), name="game_resign"),
     path("pause/<uuid:game_id>/", PauseAPI.as_view(), name="game_pause"),
-    path("timers/<uuid:game_id>/", GameTimers.as_view(), name="game_timers"),
     path("by-code/<str:code>/", GameByCode.as_view(), name="game_by_code"),
     path("my/", MyGames.as_view(), name="my_games"),
     path("r/<str:code>/", room, name="room"),
