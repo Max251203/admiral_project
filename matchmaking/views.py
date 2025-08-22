@@ -4,18 +4,20 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.contrib.auth.models import User
 import secrets
-from channels.layers import get_channel_layer
-from asgiref.sync import async_to_sync
+import asyncio
 
 from .models import MatchTicket, FriendInvite
 from game.models import Game, GameState
 
-def notify_user(user_id, event_type, data):
-    channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        f"user_{user_id}",
-        {"type": "notify", "payload": {"type": event_type, **data}}
-    )
+def safe_notify_user(user_id, event_type, data):
+    try:
+        from matchmaking.consumers.lobby_consumer import notify_user
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(notify_user(user_id, {"type": event_type, **data}))
+        loop.close()
+    except:
+        pass
 
 @login_required
 def quick(request):
@@ -33,7 +35,7 @@ def quick(request):
         other_ticket.save()
 
         game_url = f"/game/r/{g.code}/"
-        notify_user(other_ticket.user.id, 'match_found', {'url': game_url, 'game_id': str(g.id)})
+        safe_notify_user(other_ticket.user.id, 'match_found', {'url': game_url, 'game_id': str(g.id)})
         return JsonResponse({"ok": True, "url": game_url, 'game_id': str(g.id)})
 
     t, _ = MatchTicket.objects.update_or_create(user=me, active=True, defaults={"assigned_game": None})
@@ -54,7 +56,7 @@ def invite_ajax(request, user_id:int):
         defaults={'token': token}
     )
     
-    notify_user(invitee.id, "game_invite", {
+    safe_notify_user(invitee.id, "game_invite", {
         "from_user": {'login': request.user.profile.login},
         "token": token
     })
@@ -71,7 +73,7 @@ def invite_accept_api(request, token:str):
     inv.save()
     
     game_url = f"/game/r/{g.code}/"
-    notify_user(inv.inviter_id, "invite_accepted", {'url': game_url, 'game_id': str(g.id)})
+    safe_notify_user(inv.inviter_id, "invite_accepted", {'url': game_url, 'game_id': str(g.id)})
     return JsonResponse({"ok": True, "url": game_url, 'game_id': str(g.id)})
 
 @login_required
@@ -80,7 +82,7 @@ def invite_decline_api(request, token:str):
     inv.status = FriendInvite.DECLINED
     inv.save(update_fields=["status"])
     
-    notify_user(inv.inviter_id, "invite_declined", {"from_login": request.user.profile.login})
+    safe_notify_user(inv.inviter_id, "invite_declined", {"from_login": request.user.profile.login})
     return JsonResponse({"ok": True})
 
 @login_required
@@ -89,5 +91,5 @@ def invite_cancel(request, token:str):
     inv.status = FriendInvite.EXPIRED
     inv.save(update_fields=["status"])
     
-    notify_user(inv.invitee_id, "invite_cancelled", {"from_login": request.user.profile.login})
+    safe_notify_user(inv.invitee_id, "invite_cancelled", {"from_login": request.user.profile.login})
     return JsonResponse({"ok": True})

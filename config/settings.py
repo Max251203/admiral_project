@@ -3,9 +3,6 @@ from pathlib import Path
 import dj_database_url
 from dotenv import load_dotenv
 from django.contrib.messages import constants as messages
-import cloudinary
-import cloudinary.uploader
-import cloudinary.api
 
 load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,8 +22,6 @@ INSTALLED_APPS = [
     "rest_framework",
     "corsheaders",
     "channels",
-    "cloudinary_storage",
-    "cloudinary",
     "accounts",
     "game",
     "matchmaking",
@@ -61,27 +56,10 @@ TEMPLATES = [{
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
-# Cloudinary настройки
-CLOUDINARY_STORAGE = {
-    'CLOUD_NAME': os.getenv('CLOUDINARY_CLOUD_NAME', 'your-cloud-name'),
-    'API_KEY': os.getenv('CLOUDINARY_API_KEY', 'your-api-key'),
-    'API_SECRET': os.getenv('CLOUDINARY_API_SECRET', 'your-api-secret'),
-}
-
-cloudinary.config(
-    cloud_name=CLOUDINARY_STORAGE['CLOUD_NAME'],
-    api_key=CLOUDINARY_STORAGE['API_KEY'],
-    api_secret=CLOUDINARY_STORAGE['API_SECRET'],
-    secure=True
-)
-
-# Redis для продакшена
+# Эта настройка КЛЮЧЕВАЯ для работы group_add
 CHANNEL_LAYERS = {
     "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/1')],
-        },
+        "BACKEND": "channels.layers.InMemoryChannelLayer"
     },
 }
 
@@ -106,14 +84,6 @@ STATIC_ROOT = BASE_DIR/"staticfiles"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR/"media"
-
-# Используем Cloudinary для медиа файлов
-DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
-
-STORAGES = {
-    "default": {"BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage"},
-    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
-}
 
 CORS_ALLOW_ALL_ORIGINS = True
 

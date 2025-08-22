@@ -10,7 +10,7 @@
 <body data-auth="{{ request.user.is_authenticated|yesno:'1,0' }}"
       data-user-id="{% if request.user.is_authenticated %}{{ request.user.id }}{% endif %}"
       data-login="{% if request.user.is_authenticated %}{{ request.user.profile.login }}{% endif %}"
-      data-avatar="{% if request.user.is_authenticated %}{{ request.user.profile.get_avatar_url }}{% else %}https://res.cloudinary.com/your-cloud-name/image/upload/v1/default-avatar.png{% endif %}">
+      data-avatar="{% if request.user.is_authenticated %}{{ request.user.profile.get_avatar_url }}{% else %}/static/img/default-avatar.png{% endif %}">
 
   <main class="flex-center">
     <div id="msWrap" class="front-back front flex-center">
@@ -139,12 +139,12 @@
       </div>
       <h2 class="modalTitle">Профиль</h2>
       <div class="avatarBox">
-        <img id="pAvatarPreview" class="avatarLarge" src="https://res.cloudinary.com/your-cloud-name/image/upload/v1/default-avatar.png" alt="avatar">
+        <img id="pAvatarPreview" class="avatarLarge" src="/static/img/default-avatar.png" alt="avatar">
         <label for="pAvatar" class="menuButs xs">Сменить аватар</label>
         <input id="pAvatar" type="file" accept="image/*" style="display:none;">
       </div>
       <div class="tabbar">
-                <button class="tab active" data-pane="p-info">Данные</button>
+        <button class="tab active" data-pane="p-info">Данные</button>
         <button class="tab" data-pane="p-history">История игр</button>
       </div>
       <div id="p-info" class="pane active">
@@ -179,15 +179,16 @@
         </form>
       </div>
       <div id="a-register" class="pane">
+        <div class="avatarBox">
+          <img id="rAvatarPreview" class="avatarLarge" src="/static/img/default-avatar.png" alt="avatar">
+          <label for="rAvatar" class="menuButs xs">Выбрать аватар</label>
+          <input id="rAvatar" type="file" accept="image/*" style="display:none;">
+        </div>
         <form id="registerForm" enctype="multipart/form-data">
           <div class="form-row"><label>Username</label><input name="username" required></div>
           <div class="form-row"><label>Email</label><input name="email" type="email"></div>
           <div class="form-row"><label>Никнейм</label><input name="login" required></div>
           <div class="form-row"><label>Пароль</label><input name="password" type="password" required></div>
-          <div class="form-row">
-            <label>Аватар (необязательно)</label>
-            <input name="avatar" type="file" accept="image/*">
-          </div>
           <div class="btnRow"><button class="menuButs xs" type="submit">Зарегистрироваться</button></div>
         </form>
       </div>
@@ -233,7 +234,7 @@
       <div class="exit" id="gameResultExit"><div class="exit-in"><div class="exit-txt">ВЫХОД</div></div></div>
       <h2 id="resultTitle" class="result-title">Победа!</h2>
       <div id="resultDetails" class="result-details"><p>Поздравляем с победой!</p></div>
-      <div id="ratingChange" class="rating-change">Рейтинг: +100 очков</div>
+            <div id="ratingChange" class="rating-change">Рейтинг: +100 очков</div>
     </div>
   </div>
 

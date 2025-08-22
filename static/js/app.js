@@ -7,7 +7,7 @@ const App = {
     me: {
         id: document.body.dataset.userId || null,
         login: document.body.dataset.login || '',
-        avatar: document.body.dataset.avatar || '/static/img/avatar_stub.png',
+        avatar: document.body.dataset.avatar || '/static/img/default-avatar.png',
     },
     waitCtx: { active: false, token: null, canceler: null },
     game: {
@@ -148,7 +148,7 @@ function renderTopRight(){
   const profileAvatar = document.getElementById('profileAvatar');
   const profileName = document.getElementById('profileName');
   if(profileAvatar && profileName) {
-    profileAvatar.src = App.me.avatar || '/static/img/avatar_stub.png';
+    profileAvatar.src = App.me.avatar || '/static/img/default-avatar.png';
     profileName.textContent = App.isAuth ? (App.me.login || 'Профиль') : 'Войти';
   }
 }
@@ -191,6 +191,15 @@ function disconnectGameWebSocket() {
     }
 }
 
+function sendGameMessage(type, data) {
+    if (App.gameWs && App.gameWs.readyState === WebSocket.OPEN) {
+        App.gameWs.send(JSON.stringify({
+            type: type,
+            data: data
+        }));
+    }
+}
+
 function handleLobbyWebSocketMessage(event) {
     const data = JSON.parse(event.data);
     
@@ -215,6 +224,311 @@ function handleLobbyWebSocketMessage(event) {
     }
 }
 
+function addGlobalEventListeners() {
+    const startBut = document.getElementById('startBut');
+    const rulesBut = document.getElementById('rulesBut');
+    const settExit = document.getElementById('settExit');
+    const profileBtn = document.getElementById('profileBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const userSearch = document.getElementById('userSearch');
+    const friendSearch = document.getElementById('friendSearch');
+    const showMeBtn = document.getElementById('showMeBtn');
+    const quickBtn = document.getElementById('quickBtn');
+    const waitCancel = document.getElementById('waitCancel');
+    const gameInviteAccept = document.getElementById('gameInviteAccept');
+    const gameInviteDecline = document.getElementById('gameInviteDecline');
+    const friendRequestAccept = document.getElementById('friendRequestAccept');
+    const friendRequestDecline = document.getElementById('friendRequestDecline');
+    const shortPauseBtn = document.getElementById('shortPauseBtn');
+    const longPauseBtn = document.getElementById('longPauseBtn');
+    const cancelPauseBtn = document.getElementById('cancelPauseBtn');
+    const pAvatar = document.getElementById('pAvatar');
+    const rAvatar = document.getElementById('rAvatar');
+    const profileForm = document.getElementById('profileForm');
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    
+    if(startBut) startBut.addEventListener('click', () => { showContent('lobby'); });
+    if(rulesBut) rulesBut.addEventListener('click', () => showContent('rules'));
+    
+    if(settExit) {
+        settExit.addEventListener('click', () => {
+            const gameContent = document.getElementById('gameContent');
+            const lobbyContent = document.getElementById('lobbyContent');
+            const rulesContent = document.getElementById('rulesContent');
+            
+            if(gameContent && gameContent.style.display === 'block' && App.game.id) {
+                const confirmModal = document.createElement('div');
+                confirmModal.className = 'modal-backdrop';
+                confirmModal.id = 'exitConfirmModal';
+                confirmModal.innerHTML = `
+                    <div class="modal">
+                        <h3 class="modalTitle">Подтверждение</h3>
+                        <p style="text-align:center;">Выйти из текущей игры (зачтется как поражение)?</p>
+                        <div class="btnRow">
+                            <button id="confirmExitBtn" class="menuButs xs danger">Выйти</button>
+                            <button id="cancelExitBtn" class="menuButs xs">Отмена</button>
+                        </div>
+                    </div>`;
+                document.body.appendChild(confirmModal);
+                confirmModal.style.display = 'flex';
+                document.getElementById('confirmExitBtn').addEventListener('click', async () => {
+                    confirmModal.style.display='none';
+                    try{ await resignGame(); }catch{}
+                    document.body.removeChild(confirmModal);
+                    showContent('lobby');
+                });
+                                document.getElementById('cancelExitBtn').addEventListener('click', () => {
+                    confirmModal.style.display='none';
+                    document.body.removeChild(confirmModal);
+                });
+            } else {
+                showMenu();
+            }
+        });
+    }
+    
+    if(profileBtn) profileBtn.addEventListener('click', () => App.isAuth ? openProfile() : openAuth());
+    
+    if(logoutBtn) {
+        logoutBtn.addEventListener('click', async () => {
+            try{
+                await api('/accounts/api/logout/','POST',{});
+                App.isAuth = false;
+                App.me.login = '';
+                App.me.avatar = '/static/img/default-avatar.png';
+                renderTopRight();
+                showMenu();
+                showNotification('Выход', 'Вы вышли из аккаунта', 'success');
+            }catch(e){
+                showNotification('Ошибка', 'Не удалось выйти', 'error');
+            }
+        });
+    }
+    
+    document.querySelectorAll('.modal-close').forEach(x => x.addEventListener('click', () => closeModal(x.dataset.target)));
+    
+    if(pAvatar) pAvatar.addEventListener('change', () => {
+        const f = pAvatar.files && pAvatar.files[0]; 
+        if(!f) return;
+        const reader = new FileReader(); 
+        reader.onload = ev => { 
+            const pAvatarPreview = document.getElementById('pAvatarPreview');
+            if(pAvatarPreview) pAvatarPreview.src = ev.target.result; 
+        }; 
+        reader.readAsDataURL(f);
+    });
+    
+    if(rAvatar) rAvatar.addEventListener('change', () => {
+        const f = rAvatar.files && rAvatar.files[0]; 
+        if(!f) return;
+        const reader = new FileReader(); 
+        reader.onload = ev => { 
+            const rAvatarPreview = document.getElementById('rAvatarPreview');
+            if(rAvatarPreview) rAvatarPreview.src = ev.target.result; 
+        }; 
+        reader.readAsDataURL(f);
+    });
+    
+    if(profileForm) profileForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(profileForm);
+        if(pAvatar.files && pAvatar.files[0]) fd.set('avatar', pAvatar.files[0]);
+        try{
+            const res = await api('/accounts/api/profile/update/','POST', fd, true);
+            if(res.ok){
+                if(res.profile){
+                    App.me.login = res.profile.login || App.me.login;
+                    if(res.profile.avatar) App.me.avatar = res.profile.avatar;
+                }
+                renderTopRight();
+                showNotification('Успех', 'Профиль сохранен', 'success');
+                closeModal('profileModal');
+            } else {
+                showNotification('Ошибка', 'Не удалось сохранить профиль', 'error');
+            }
+        }catch(err){ 
+            let msg = 'Не удалось сохранить профиль';
+            if(err.response && err.response.data && err.response.data.errors) {
+                msg = Object.entries(err.response.data.errors).map(([key, val]) => `${key}: ${val}`).join(' ');
+            }
+            showNotification('Ошибка', msg, 'error'); 
+        }
+    });
+    
+    if(loginForm) loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const d = Object.fromEntries(new FormData(loginForm).entries());
+        try{
+            const r = await api('/accounts/api/login/','POST', d);
+            if(r.ok){
+                App.isAuth=true; 
+                App.me.id=r.id;
+                App.me.login=r.login||d.username; 
+                if(r.avatar) App.me.avatar=r.avatar;
+                renderTopRight(); 
+                closeModal('authModal');
+                connectLobbyWebSocket();
+                showNotification('Успех', 'Вы успешно вошли в систему', 'success');
+            }else {
+                showNotification('Ошибка', 'Неверный логин или пароль', 'error');
+            }
+        }catch(err){ 
+            showNotification('Ошибка', 'Ошибка входа в систему', 'error'); 
+        }
+    });
+    
+    if(registerForm) registerForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(registerForm);
+        if(rAvatar.files && rAvatar.files[0]) fd.set('avatar', rAvatar.files[0]);
+        try{
+            const r = await api('/accounts/api/register/','POST', fd, true);
+            if(r.ok){
+                const loginData = {
+                    username: fd.get('username'),
+                    password: fd.get('password')
+                };
+                const r2 = await api('/accounts/api/login/','POST', loginData);
+                if(r2.ok){
+                    App.isAuth=true; 
+                    App.me.id=r2.id;
+                    App.me.login=fd.get('login'); 
+                    if(r2.avatar) App.me.avatar=r2.avatar;
+                    renderTopRight(); 
+                    closeModal('authModal');
+                    connectLobbyWebSocket();
+                    showNotification('Успех', 'Регистрация прошла успешно', 'success');
+                }
+            }
+        }catch(err){ 
+            let msg = 'Ошибка регистрации';
+            if(err.response && err.response.data) {
+                msg = Object.entries(err.response.data).map(([key, val]) => `${key}: ${Array.isArray(val) ? val.join(', ') : val}`).join(' ');
+            }
+            showNotification('Ошибка', msg, 'error'); 
+        }
+    });
+    
+    if(userSearch) userSearch.addEventListener('input', () => loadUsers(userSearch.value.trim()));
+    if(friendSearch) friendSearch.addEventListener('input', () => filterFriends(friendSearch.value.trim()));
+    if(showMeBtn) showMeBtn.addEventListener('click', () => {
+        if(!App.isAuth) return;
+        const usersList = document.getElementById('usersList');
+        if(!usersList) return;
+        const myItem = usersList.querySelector(`[data-login="${App.me.login}"]`);
+        if(myItem) {
+            myItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            myItem.style.background = 'rgba(255,255,0,.3)'; 
+            setTimeout(() => { myItem.style.background = 'rgba(255,255,0,.1)'; }, 2000);
+        }
+    });
+    
+    if(quickBtn) quickBtn.addEventListener('click', async () => {
+        if(!App.isAuth){ openAuth(); return; }
+        try{
+            const r = await api('/match/quick/');
+            if(r.url){ startGameByRoomUrl(r.url); return; }
+            if(r.queued){
+                showWaiting('Ищем соперника...', async () => { await api('/match/cancel/'); });
+            }
+        }catch(err){ 
+            showNotification('Ошибка', 'Не удалось начать поиск соперника', 'error'); 
+        }
+    });
+    
+    if(waitCancel) waitCancel.addEventListener('click', async () => { 
+        try{ 
+            if(App.waitCtx.canceler) await App.waitCtx.canceler(); 
+        } finally{ 
+            hideWaiting(); 
+        } 
+    });
+    
+    if(gameInviteAccept) gameInviteAccept.addEventListener('click', async () => {
+        if(!App.currentInviteToken) return;
+        try { 
+            const res = await api(`/match/invite/${App.currentInviteToken}/accept/`, 'POST'); 
+            if(res.ok && res.url) { 
+                closeModal('gameInviteModal'); 
+                App.currentInviteToken = null; 
+                startGameByRoomUrl(res.url); 
+            } 
+        } catch(err) { 
+            showNotification('Ошибка', 'Не удалось принять приглашение', 'error'); 
+        }
+    });
+    
+    if(gameInviteDecline) gameInviteDecline.addEventListener('click', async () => {
+        if(!App.currentInviteToken) return;
+        try { 
+            await api(`/match/invite/${App.currentInviteToken}/decline/`, 'POST'); 
+            closeModal('gameInviteModal'); 
+            App.currentInviteToken = null; 
+            showNotification('Информация', 'Приглашение отклонено', 'info'); 
+        } catch(err) { 
+            showNotification('Ошибка', 'Ошибка отклонения приглашения', 'error'); 
+        }
+    });
+    
+    if(friendRequestAccept) friendRequestAccept.addEventListener('click', async () => {
+        if(!App.currentFriendRequest) return;
+        try { 
+            await api('/accounts/api/friends/accept/', 'POST', {request_id: App.currentFriendRequest.request_id}); 
+            closeModal('friendRequestModal'); 
+            App.currentFriendRequest = null; 
+            showNotification('Успех', 'Запрос в друзья принят', 'success');
+            loadFriends();
+        } catch(err) { 
+            showNotification('Ошибка', 'Не удалось принять запрос', 'error'); 
+        }
+    });
+    
+    if(friendRequestDecline) friendRequestDecline.addEventListener('click', async () => {
+        if(!App.currentFriendRequest) return;
+        try { 
+            await api('/accounts/api/friends/decline/', 'POST', {request_id: App.currentFriendRequest.request_id}); 
+            closeModal('friendRequestModal'); 
+            App.currentFriendRequest = null; 
+            showNotification('Информация', 'Запрос в друзья отклонен', 'info'); 
+        } catch(err) { 
+            showNotification('Ошибка', 'Ошибка отклонения запроса', 'error'); 
+        }
+    });
+    
+    if(shortPauseBtn) {
+        shortPauseBtn.addEventListener('click', async () => {
+            try {
+                sendGameMessage('pause', {type: 'short'});
+                closeModal('pauseModal');
+                showNotification('Пауза', 'Короткая пауза активирована (1 минута)', 'info');
+            } catch(err) {
+                showNotification('Ошибка', 'Не удалось активировать паузу: ' + err.message, 'error');
+            }
+        });
+    }
+    
+    if(longPauseBtn) {
+        longPauseBtn.addEventListener('click', async () => {
+            try {
+                sendGameMessage('pause', {type: 'long'});
+                closeModal('pauseModal');
+                showNotification('Пауза', 'Длинная пауза активирована (3 минуты)', 'info');
+            } catch(err) {
+                showNotification('Ошибка', 'Не удалось активировать паузу: ' + err.message, 'error');
+            }
+        });
+    }
+    
+    if(cancelPauseBtn) {
+        cancelPauseBtn.addEventListener('click', () => {
+            closeModal('pauseModal');
+        });
+    }
+    
+    initTabs();
+}
+
 function handleGameWebSocketMessage(event) {
     const data = JSON.parse(event.data);
     
@@ -222,6 +536,26 @@ function handleGameWebSocketMessage(event) {
         handleGameStateUpdate(data);
     } else if (data.type === 'tick') {
         handleGameTick(data);
+    } else if (data.type === 'game_finished') {
+        showGameResult(data.winner, data.reason);
+    } else if (data.type === 'game_paused') {
+        showPauseOverlay(data.duration, data.initiator === App.game.myPlayer);
+    } else if (data.type === 'setup_submitted') {
+        if (data.status !== 'SETUP') {
+            App.game.setupPhase = false;
+            createGameUI();
+            showNotification('Игра началась!', 'Фаза расстановки завершена', 'success');
+        } else {
+            showNotification('Ожидание', 'Ожидаем пока соперник расставит свои фишки', 'info');
+        }
+    } else if (data.type === 'group_candidates') {
+        App.game.selection.candidates = data.candidates || [];
+        showGroupCandidates();
+    } else if (data.type === 'special_attacks') {
+        App.game.selection.specialAttack = data.options;
+        showSpecialAttacks();
+    } else if (data.type === 'error') {
+        showNotification('Ошибка', data.message, 'error');
     }
 }
 
@@ -240,6 +574,10 @@ function handleGameStateUpdate(data) {
     
     renderGameStatic();
     updateKilledTable();
+    
+    if (data.result) {
+        handleMoveResult(data.result);
+    }
     
     if (App.game.isFinished) {
         showGameResult(data.state.winner, data.state.win_reason);
@@ -285,7 +623,7 @@ function updateTimersFromTick(data) {
     const opponentBankMinutes = Math.floor(opponentBankSeconds / 60);
     const opponentBankSecondsRem = opponentBankSeconds % 60;
     hudOpponentBank.textContent = `${opponentBankMinutes}:${String(opponentBankSecondsRem).padStart(2, '0')}`;
-        hudOpponentBank.style.color = opponentBankSeconds <= 60 ? '#ff5e2c' : '';
+    hudOpponentBank.style.color = opponentBankSeconds <= 60 ? '#ff5e2c' : '';
     
     if (data.turn === App.game.myPlayer && myTurnStartTime) {
         const currentTime = Date.now() / 1000;
@@ -343,7 +681,7 @@ function openProfile(){
     const pAvatarPreview = document.getElementById('pAvatarPreview');
     
     if (pLogin) pLogin.value = App.me.login || '';
-    if (pAvatarPreview) pAvatarPreview.src = App.me.avatar || '/static/img/avatar_stub.png';
+    if (pAvatarPreview) pAvatarPreview.src = App.me.avatar || '/static/img/default-avatar.png';
     
     api('/accounts/api/me/').then(me=>{
         if (pUsername) pUsername.value = me.username || '';
@@ -520,7 +858,7 @@ async function loadHistory() {
     try {
         const data = await api('/game/my/');
         const items = data.items || [];
-        const historyList = document.getElementById('historyList');
+                const historyList = document.getElementById('historyList');
         
         if(!historyList) return;
         
@@ -621,7 +959,7 @@ function createGameUI() {
             <div class="mobile-fleet-inner" id="mobileFleetInner"></div>
         </div>
         <div class="side-panel" id="leftPanel">
-                        <div class="side-panel-inner" id="leftPanelInner"></div>
+            <div class="side-panel-inner" id="leftPanelInner"></div>
         </div>
         <div class="board-container">
             <div id="board" class="board"></div>
@@ -735,6 +1073,10 @@ async function handleGameClick(x, y, cell) {
             }
         } else if(cell.classList.contains('group-candidate')) {
             await addToGroup(x, y);
+        } else if(cell.classList.contains('torpedo-direction')) {
+            await handleTorpedoAttack(x, y, cell);
+        } else if(cell.classList.contains('air-attack-zone')) {
+            await handleAirAttack(x, y);
         } else if(piece && parseInt(piece.dataset.owner) === App.game.myPlayer) {
             await selectPiece(x, y, piece);
         } else {
@@ -759,26 +1101,49 @@ async function selectPiece(x, y, piece) {
     
     highlightCell(x, y, 'selected');
     
-    try {
-        const [realX, realY] = uiToReal(x, y);
-        const response = await api(`/game/group_candidates/${App.game.id}/`, 'POST', {coord: [realX, realY]});
-        App.game.selection.candidates = response.candidates || [];
-    } catch(e) {
-        App.game.selection.candidates = [];
-    }
+    const [realX, realY] = uiToReal(x, y);
+    sendGameMessage('get_group_candidates', {coord: [realX, realY]});
+    sendGameMessage('get_special_attacks', {});
     
+    await showValidMoves(x, y, pieceType);
+    
+    showHint(`Выбрана ${ruType}. Выберите действие`);
+}
+
+function showGroupCandidates() {
     if(App.game.selection.candidates.length > 0) {
         App.game.selection.candidates.forEach(coord => {
             const [uiX, uiY] = realToUi(coord[0], coord[1]);
             highlightCell(uiX, uiY, 'group-candidate');
         });
-        showHint(`Выбрана ${ruType}. Кликните на мигающие фишки для группы или выберите ход`);
-    } else {
-        showHint(`Выбрана ${ruType}. Выберите клетку для перемещения`);
+        showHint('Синие фишки - для группы, зеленые - для хода');
+    }
+}
+
+function showSpecialAttacks() {
+    if(!App.game.selection.specialAttack) return;
+    
+    if(App.game.selection.specialAttack.torpedo.length > 0) {
+        App.game.selection.specialAttack.torpedo.forEach(attack => {
+            const [uiTkX, uiTkY] = realToUi(attack.tk[0], attack.tk[1]);
+            if(App.game.selection.piece && 
+               (App.game.selection.piece.x === uiTkX && App.game.selection.piece.y === uiTkY)) {
+                showTorpedoDirections(attack);
+                showHint('Доступна торпедная атака! Выберите направление стрельбы');
+            }
+        });
     }
     
-    await showValidMoves(x, y, pieceType);
-    await checkSpecialAttacks();
+    if(App.game.selection.specialAttack.air.length > 0) {
+        App.game.selection.specialAttack.air.forEach(attack => {
+            const [uiCarrierX, uiCarrierY] = realToUi(attack.carrier[0], attack.carrier[1]);
+            if(App.game.selection.piece && 
+               (App.game.selection.piece.x === uiCarrierX && App.game.selection.piece.y === uiCarrierY)) {
+                showAirAttackZone(attack);
+                showHint('Доступна воздушная атака! Кликните на зону атаки');
+            }
+        });
+    }
 }
 
 async function addToGroup(x, y) {
@@ -834,7 +1199,7 @@ async function showValidMoves(x, y, pieceType) {
     
     if(apiType === 'TK') {
         directions.forEach(dir => {
-            for(let dist = 1; dist <= 2; dist++) {
+                        for(let dist = 1; dist <= 2; dist++) {
                 const nx = x + dir.dx * dist;
                 const ny = y + dir.dy * dist;
                 
@@ -900,37 +1265,6 @@ async function showGroupMoves() {
     });
 }
 
-async function checkSpecialAttacks() {
-    try {
-        const response = await api(`/game/special_attacks/${App.game.id}/`);
-        App.game.selection.specialAttack = response.options;
-        
-        if(App.game.selection.specialAttack.torpedo.length > 0) {
-            App.game.selection.specialAttack.torpedo.forEach(attack => {
-                const [uiTkX, uiTkY] = realToUi(attack.tk[0], attack.tk[1]);
-                if(App.game.selection.piece && 
-                   (App.game.selection.piece.x === uiTkX && App.game.selection.piece.y === uiTkY)) {
-                    showTorpedoDirections(attack);
-                    showHint('Доступна торпедная атака! Выберите направление стрельбы');
-                }
-            });
-        }
-        
-        if(App.game.selection.specialAttack.air.length > 0) {
-            App.game.selection.specialAttack.air.forEach(attack => {
-                const [uiCarrierX, uiCarrierY] = realToUi(attack.carrier[0], attack.carrier[1]);
-                if(App.game.selection.piece && 
-                   (App.game.selection.piece.x === uiCarrierX && App.game.selection.piece.y === uiCarrierY)) {
-                    showAirAttackZone(attack);
-                    showHint('Доступна воздушная атака! Кликните на зону атаки');
-                }
-            });
-        }
-    } catch(e) {
-        App.game.selection.specialAttack = {torpedo: [], air: []};
-    }
-}
-
 function showTorpedoDirections(attack) {
     const [uiTorpedoX, uiTorpedoY] = realToUi(attack.torpedo[0], attack.torpedo[1]);
     
@@ -975,9 +1309,41 @@ function showAirAttackZone(attack) {
     }
 }
 
+async function handleTorpedoAttack(x, y, cell) {
+    const direction = cell.dataset.torpedoDir.split(',').map(Number);
+    const attack = App.game.selection.specialAttack.torpedo[0];
+    
+    const [realTorpedoX, realTorpedoY] = uiToReal(attack.torpedo[0], attack.torpedo[1]);
+    const [realTkX, realTkY] = uiToReal(attack.tk[0], attack.tk[1]);
+    
+    sendGameMessage('torpedo_attack', {
+        torpedo: [realTorpedoX, realTorpedoY],
+        tk: [realTkX, realTkY],
+        direction: direction
+    });
+    
+    clearSelection();
+    showHint('Торпедная атака выполнена');
+}
+
+async function handleAirAttack(x, y) {
+    const attack = App.game.selection.specialAttack.air[0];
+    
+    const [realCarrierX, realCarrierY] = uiToReal(attack.carrier[0], attack.carrier[1]);
+    const [realPlaneX, realPlaneY] = uiToReal(attack.plane[0], attack.plane[1]);
+    
+    sendGameMessage('air_attack', {
+        carrier: [realCarrierX, realCarrierY],
+        plane: [realPlaneX, realPlaneY]
+    });
+    
+    clearSelection();
+    showHint('Воздушная атака выполнена');
+}
+
 function clearSelection() {
     App.game.selection = { type: 'none', piece: null, group: [], candidates: [], validMoves: [], specialAttack: null };
-        document.querySelectorAll('.cell.selected, .cell.valid-move, .cell.group-candidate, .cell.torpedo-direction, .cell.air-attack-zone, .cell.group-selected').forEach(el => {
+    document.querySelectorAll('.cell.selected, .cell.valid-move, .cell.group-candidate, .cell.torpedo-direction, .cell.air-attack-zone, .cell.group-selected').forEach(el => {
         el.classList.remove('selected', 'valid-move', 'group-candidate', 'torpedo-direction', 'air-attack-zone', 'group-selected');
         el.removeAttribute('data-torpedo-dir');
     });
@@ -987,47 +1353,20 @@ function clearSelection() {
 async function movePiece(fx, fy, tx, ty) {
     try {
         const followers = [];
-        try {
-            const [realFx, realFy] = uiToReal(fx, fy);
-            const response = await api(`/game/carried_pieces/${App.game.id}/`, 'POST', {coord: [realFx, realFy]});
-            const carried = response.carried || [];
-            
-            carried.forEach(carriedCoord => {
-                const directions = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
-                for(const dir of directions) {
-                    const newX = tx + dir.dx;
-                    const newY = ty + dir.dy;
-                    
-                    if(newX >= 0 && newX < 14 && newY >= 0 && newY < 15) {
-                        const cell = getCellElement(newX, newY);
-                        if(!cell.querySelector('.piece')) {
-                            const [realNewX, realNewY] = uiToReal(newX, newY);
-                            followers.push([carriedCoord[0], carriedCoord[1], realNewX, realNewY]);
-                            break;
-                        }
-                    }
-                }
-            });
-        } catch(e) {}
         
         const [realFx, realFy] = uiToReal(fx, fy);
         const [realTx, realTy] = uiToReal(tx, ty);
         
-        const res = await api(`/game/move/${App.game.id}/`, 'POST', {
+        sendGameMessage('make_move', {
             src: [realFx, realFy],
             dst: [realTx, realTy],
             followers: followers
         });
         
-        if(res.ok) {
-            clearSelection();
-            if(res.result && res.result.event) {
-                handleMoveResult(res.result);
-            } else {
-                showHint('Ход выполнен. Ход противника');
-            }
-            App.game.mode = 'waiting_turn';
-        }
+        clearSelection();
+        showHint('Ход отправлен');
+        App.game.mode = 'waiting_turn';
+        
     } catch(err) {
         showNotification('Ошибка', 'Не удалось выполнить ход: ' + err.message, 'error');
         clearSelection();
@@ -1057,21 +1396,16 @@ async function moveGroup(toX, toY) {
         const [realLx, realLy] = uiToReal(leader.x, leader.y);
         const [realTx, realTy] = uiToReal(toX, toY);
         
-        const res = await api(`/game/move/${App.game.id}/`, 'POST', {
+        sendGameMessage('make_move', {
             src: [realLx, realLy],
             dst: [realTx, realTy],
             followers: followers
         });
         
-        if(res.ok) {
-            clearSelection();
-            if(res.result && res.result.event) {
-                handleMoveResult(res.result);
-            } else {
-                showHint('Группа перемещена. Ход противника');
-            }
-            App.game.mode = 'waiting_turn';
-        }
+        clearSelection();
+        showHint('Группа перемещена');
+        App.game.mode = 'waiting_turn';
+        
     } catch(err) {
         showNotification('Ошибка', 'Не удалось переместить группу: ' + err.message, 'error');
         clearSelection();
@@ -1143,16 +1477,16 @@ async function placeShip(x, y, shipType) {
     
     try {
         const [realX, realY] = uiToReal(x, y);
-        const res = await api(`/game/setup/${App.game.id}/`, 'POST', {
+        
+        sendGameMessage('setup_piece', {
             placements: [{ x: realX, y: realY, kind: convertToApiShipType(shipType) }]
         });
         
-        if(res.ok) {
-            App.game.shipCounts[shipType]--;
-            updateShipCounts();
-            checkAllShipsPlaced();
-            showNotification('Успех', `${shipType} размещен`, 'success');
-        }
+        App.game.shipCounts[shipType]--;
+        updateShipCounts();
+        checkAllShipsPlaced();
+        showNotification('Успех', `${shipType} размещен`, 'success');
+        
     } catch(err) {
         showNotification('Ошибка', 'Не удалось разместить корабль: ' + err.message, 'error');
     }
@@ -1276,13 +1610,11 @@ function checkAllShipsPlaced() {
 
 async function clearSetup() {
     try {
-        const res = await api(`/game/clear_setup/${App.game.id}/`, 'POST', {});
-        if(res.ok) {
-            initializeShipCounts();
-            updateShipCounts();
-            App.game.allShipsPlaced = false;
-            showNotification('Успех', 'Расстановка очищена', 'success');
-        }
+        sendGameMessage('clear_setup', {});
+        initializeShipCounts();
+        updateShipCounts();
+        App.game.allShipsPlaced = false;
+        showNotification('Успех', 'Расстановка очищена', 'success');
     } catch(err) {
         showNotification('Ошибка', 'Не удалось очистить расстановку: ' + err.message, 'error');
     }
@@ -1300,20 +1632,8 @@ async function submitSetup() {
     }
     
     try {
-        const res = await api(`/game/submit_setup/${App.game.id}/`, 'POST', {});
-        if(res && res.ok) {
-            showNotification('Готово', 'Расстановка подтверждена', 'success');
-            
-            if(res.status !== 'SETUP') {
-                App.game.setupPhase = false;
-                createGameUI();
-                showNotification('Игра началась!', 'Фаза расстановки завершена', 'success');
-            } else {
-                const waitOpponentModal = document.getElementById('waitOpponentModal');
-                if(waitOpponentModal) waitOpponentModal.style.display = 'flex';
-                showNotification('Ожидание', 'Ожидаем пока соперник расставит свои фишки', 'info');
-            }
-        }
+        sendGameMessage('submit_setup', {});
+        showNotification('Готово', 'Расстановка подтверждена', 'success');
     } catch(err) {
         showNotification('Ошибка', 'Не удалось подтвердить расстановку: ' + err.message, 'error');
     }
@@ -1323,14 +1643,12 @@ async function autoSetup() {
     if(!App.game.id) return;
     
     try {
-        const res = await api(`/game/autosetup/${App.game.id}/`, 'POST', {});
-        if(res) {
-            Object.keys(App.game.shipCounts).forEach(type => App.game.shipCounts[type] = 0);
-            updateShipCounts();
-                        showNotification('Успех', 'Автоматическая расстановка завершена', 'success');
-            App.game.allShipsPlaced = true;
-            checkAllShipsPlaced();
-        }
+        sendGameMessage('auto_setup', {});
+        Object.keys(App.game.shipCounts).forEach(type => App.game.shipCounts[type] = 0);
+        updateShipCounts();
+        showNotification('Успех', 'Автоматическая расстановка завершена', 'success');
+        App.game.allShipsPlaced = true;
+        checkAllShipsPlaced();
     } catch(err) {
         showNotification('Ошибка', 'Ошибка автоматической расстановки: ' + err.message, 'error');
     }
@@ -1533,7 +1851,7 @@ function showPauseOverlay(seconds, isInitiator) {
         if(cancelPauseBtn2) {
             cancelPauseBtn2.onclick = async () => {
                 try {
-                    await api(`/game/cancel_pause/${App.game.id}/`, 'POST');
+                    sendGameMessage('cancel_pause', {});
                     hidePauseOverlay();
                     showNotification('Пауза снята', 'Игра продолжается', 'success');
                 } catch(err) {
@@ -1597,11 +1915,9 @@ function openResignModal() {
 
 async function resignGame() {
     try {
-        const res = await api(`/game/resign/${App.game.id}/`, 'POST');
-        if(res.ok) {
-            showNotification('Игра завершена', 'Вы сдались', 'info');
-            App.game.isFinished = true;
-        }
+        sendGameMessage('resign', {});
+        showNotification('Игра завершена', 'Вы сдались', 'info');
+        App.game.isFinished = true;
     } catch(err) {
         showNotification('Ошибка', 'Не удалось сдаться: ' + err.message, 'error');
     }
@@ -1624,7 +1940,7 @@ function showGameResult(winner, reason) {
     
     const reasons = {
         'bases_destroyed': 'Уничтожены военно-морские базы',
-        'no_mobile_pieces': 'Уничтожены все движущиеся корабли',
+                'no_mobile_pieces': 'Уничтожены все движущиеся корабли',
         'time': 'Закончилось время',
         'resign': isWinner ? 'Противник сдался' : 'Вы сдались'
     };
@@ -1652,302 +1968,6 @@ function showGameResult(winner, reason) {
             }, 100);
         };
     }
-}
-
-function addGlobalEventListeners() {
-    const startBut = document.getElementById('startBut');
-    const rulesBut = document.getElementById('rulesBut');
-    const settExit = document.getElementById('settExit');
-    const profileBtn = document.getElementById('profileBtn');
-    const logoutBtn = document.getElementById('logoutBtn');
-    const userSearch = document.getElementById('userSearch');
-    const friendSearch = document.getElementById('friendSearch');
-    const showMeBtn = document.getElementById('showMeBtn');
-    const quickBtn = document.getElementById('quickBtn');
-    const waitCancel = document.getElementById('waitCancel');
-    const gameInviteAccept = document.getElementById('gameInviteAccept');
-    const gameInviteDecline = document.getElementById('gameInviteDecline');
-    const friendRequestAccept = document.getElementById('friendRequestAccept');
-    const friendRequestDecline = document.getElementById('friendRequestDecline');
-    const shortPauseBtn = document.getElementById('shortPauseBtn');
-    const longPauseBtn = document.getElementById('longPauseBtn');
-    const cancelPauseBtn = document.getElementById('cancelPauseBtn');
-    const pAvatar = document.getElementById('pAvatar');
-    const profileForm = document.getElementById('profileForm');
-    const loginForm = document.getElementById('loginForm');
-    const registerForm = document.getElementById('registerForm');
-    
-    if(startBut) startBut.addEventListener('click', () => { showContent('lobby'); });
-    if(rulesBut) rulesBut.addEventListener('click', () => showContent('rules'));
-    
-    if(settExit) {
-        settExit.addEventListener('click', () => {
-            const gameContent = document.getElementById('gameContent');
-            const lobbyContent = document.getElementById('lobbyContent');
-            const rulesContent = document.getElementById('rulesContent');
-            
-            if(gameContent && gameContent.style.display === 'block' && App.game.id) {
-                                const confirmModal = document.createElement('div');
-                confirmModal.className = 'modal-backdrop';
-                confirmModal.id = 'exitConfirmModal';
-                confirmModal.innerHTML = `
-                    <div class="modal">
-                        <h3 class="modalTitle">Подтверждение</h3>
-                        <p style="text-align:center;">Выйти из текущей игры (зачтется как поражение)?</p>
-                        <div class="btnRow">
-                            <button id="confirmExitBtn" class="menuButs xs danger">Выйти</button>
-                            <button id="cancelExitBtn" class="menuButs xs">Отмена</button>
-                        </div>
-                    </div>`;
-                document.body.appendChild(confirmModal);
-                confirmModal.style.display = 'flex';
-                document.getElementById('confirmExitBtn').addEventListener('click', async () => {
-                    confirmModal.style.display='none';
-                    try{ await resignGame(); }catch{}
-                    document.body.removeChild(confirmModal);
-                    showContent('lobby');
-                });
-                document.getElementById('cancelExitBtn').addEventListener('click', () => {
-                    confirmModal.style.display='none';
-                    document.body.removeChild(confirmModal);
-                });
-            } else {
-                showMenu();
-            }
-        });
-    }
-    
-    if(profileBtn) profileBtn.addEventListener('click', () => App.isAuth ? openProfile() : openAuth());
-    
-    if(logoutBtn) {
-        logoutBtn.addEventListener('click', async () => {
-            try{
-                await api('/accounts/api/logout/','POST',{});
-                App.isAuth = false;
-                App.me.login = '';
-                App.me.avatar = '/static/img/avatar_stub.png';
-                renderTopRight();
-                showMenu();
-                showNotification('Выход', 'Вы вышли из аккаунта', 'success');
-            }catch(e){
-                showNotification('Ошибка', 'Не удалось выйти', 'error');
-            }
-        });
-    }
-    
-    document.querySelectorAll('.modal-close').forEach(x => x.addEventListener('click', () => closeModal(x.dataset.target)));
-    
-    if(pAvatar) pAvatar.addEventListener('change', () => {
-        const f = pAvatar.files && pAvatar.files[0]; 
-        if(!f) return;
-        const reader = new FileReader(); 
-        reader.onload = ev => { 
-            const pAvatarPreview = document.getElementById('pAvatarPreview');
-            if(pAvatarPreview) pAvatarPreview.src = ev.target.result; 
-        }; 
-        reader.readAsDataURL(f);
-    });
-    
-    if(profileForm) profileForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const fd = new FormData(profileForm);
-        if(pAvatar.files && pAvatar.files[0]) fd.set('avatar', pAvatar.files[0]);
-        try{
-            const res = await api('/accounts/api/profile/update/','POST', fd, true);
-            if(res.ok){
-                if(res.profile){
-                    App.me.login = res.profile.login || App.me.login;
-                    if(res.profile.avatar) App.me.avatar = res.profile.avatar;
-                }
-                renderTopRight();
-                showNotification('Успех', 'Профиль сохранен', 'success');
-                closeModal('profileModal');
-            } else {
-                showNotification('Ошибка', 'Не удалось сохранить профиль', 'error');
-            }
-        }catch(err){ 
-            let msg = 'Не удалось сохранить профиль';
-            if(err.response && err.response.data && err.response.data.errors) {
-                msg = Object.entries(err.response.data.errors).map(([key, val]) => `${key}: ${val}`).join(' ');
-            }
-            showNotification('Ошибка', msg, 'error'); 
-        }
-    });
-    
-    if(loginForm) loginForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const d = Object.fromEntries(new FormData(loginForm).entries());
-        try{
-            const r = await api('/accounts/api/login/','POST', d);
-            if(r.ok){
-                App.isAuth=true; 
-                App.me.id=r.id;
-                App.me.login=r.login||d.username; 
-                if(r.avatar) App.me.avatar=r.avatar;
-                renderTopRight(); 
-                closeModal('authModal');
-                connectLobbyWebSocket();
-                showNotification('Успех', 'Вы успешно вошли в систему', 'success');
-            }else {
-                showNotification('Ошибка', 'Неверный логин или пароль', 'error');
-            }
-        }catch(err){ 
-            showNotification('Ошибка', 'Ошибка входа в систему', 'error'); 
-        }
-    });
-    
-    if(registerForm) registerForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const fd = new FormData(registerForm);
-        try{
-            const r = await api('/accounts/api/register/','POST', fd, true);
-            if(r.ok){
-                const loginData = {
-                    username: fd.get('username'),
-                    password: fd.get('password')
-                };
-                const r2 = await api('/accounts/api/login/','POST', loginData);
-                if(r2.ok){
-                    App.isAuth=true; 
-                    App.me.id=r2.id;
-                    App.me.login=fd.get('login'); 
-                    if(r2.avatar) App.me.avatar=r2.avatar;
-                    renderTopRight(); 
-                    closeModal('authModal');
-                    connectLobbyWebSocket();
-                    showNotification('Успех', 'Регистрация прошла успешно', 'success');
-                }
-            }
-        }catch(err){ 
-            let msg = 'Ошибка регистрации';
-            if(err.response && err.response.data) {
-                msg = Object.entries(err.response.data).map(([key, val]) => `${key}: ${Array.isArray(val) ? val.join(', ') : val}`).join(' ');
-            }
-            showNotification('Ошибка', msg, 'error'); 
-        }
-    });
-    
-    if(userSearch) userSearch.addEventListener('input', () => loadUsers(userSearch.value.trim()));
-    if(friendSearch) friendSearch.addEventListener('input', () => filterFriends(friendSearch.value.trim()));
-    if(showMeBtn) showMeBtn.addEventListener('click', () => {
-        if(!App.isAuth) return;
-        const usersList = document.getElementById('usersList');
-        if(!usersList) return;
-        const myItem = usersList.querySelector(`[data-login="${App.me.login}"]`);
-        if(myItem) {
-            myItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            myItem.style.background = 'rgba(255,255,0,.3)'; 
-            setTimeout(() => { myItem.style.background = 'rgba(255,255,0,.1)'; }, 2000);
-        }
-    });
-    
-    if(quickBtn) quickBtn.addEventListener('click', async () => {
-        if(!App.isAuth){ openAuth(); return; }
-        try{
-            const r = await api('/match/quick/');
-            if(r.url){ startGameByRoomUrl(r.url); return; }
-            if(r.queued){
-                showWaiting('Ищем соперника...', async () => { await api('/match/cancel/'); });
-            }
-        }catch(err){ 
-            showNotification('Ошибка', 'Не удалось начать поиск соперника', 'error'); 
-        }
-    });
-    
-    if(waitCancel) waitCancel.addEventListener('click', async () => { 
-        try{ 
-            if(App.waitCtx.canceler) await App.waitCtx.canceler(); 
-        } finally{ 
-            hideWaiting(); 
-        } 
-    });
-    
-    if(gameInviteAccept) gameInviteAccept.addEventListener('click', async () => {
-        if(!App.currentInviteToken) return;
-        try { 
-            const res = await api(`/match/invite/${App.currentInviteToken}/accept/`, 'POST'); 
-            if(res.ok && res.url) { 
-                closeModal('gameInviteModal'); 
-                App.currentInviteToken = null; 
-                startGameByRoomUrl(res.url); 
-            } 
-        } catch(err) { 
-            showNotification('Ошибка', 'Не удалось принять приглашение', 'error'); 
-        }
-    });
-    
-    if(gameInviteDecline) gameInviteDecline.addEventListener('click', async () => {
-        if(!App.currentInviteToken) return;
-        try { 
-            await api(`/match/invite/${App.currentInviteToken}/decline/`, 'POST'); 
-            closeModal('gameInviteModal'); 
-            App.currentInviteToken = null; 
-            showNotification('Информация', 'Приглашение отклонено', 'info'); 
-        } catch(err) { 
-            showNotification('Ошибка', 'Ошибка отклонения приглашения', 'error'); 
-        }
-    });
-    
-    if(friendRequestAccept) friendRequestAccept.addEventListener('click', async () => {
-        if(!App.currentFriendRequest) return;
-        try { 
-            await api('/accounts/api/friends/accept/', 'POST', {request_id: App.currentFriendRequest.request_id}); 
-            closeModal('friendRequestModal'); 
-            App.currentFriendRequest = null; 
-            showNotification('Успех', 'Запрос в друзья принят', 'success');
-            loadFriends();
-        } catch(err) { 
-            showNotification('Ошибка', 'Не удалось принять запрос', 'error'); 
-        }
-    });
-    
-    if(friendRequestDecline) friendRequestDecline.addEventListener('click', async () => {
-        if(!App.currentFriendRequest) return;
-        try { 
-            await api('/accounts/api/friends/decline/', 'POST', {request_id: App.currentFriendRequest.request_id}); 
-            closeModal('friendRequestModal'); 
-            App.currentFriendRequest = null; 
-            showNotification('Информация', 'Запрос в друзья отклонен', 'info'); 
-        } catch(err) { 
-            showNotification('Ошибка', 'Ошибка отклонения запроса', 'error'); 
-        }
-    });
-    
-    if(shortPauseBtn) {
-        shortPauseBtn.addEventListener('click', async () => {
-            try {
-                const res = await api(`/game/pause/${App.game.id}/`, 'POST', {type: 'short'});
-                if(res.ok) {
-                    closeModal('pauseModal');
-                    showNotification('Пауза', 'Короткая пауза активирована (1 минута)', 'info');
-                }
-            } catch(err) {
-                showNotification('Ошибка', 'Не удалось активировать паузу: ' + err.message, 'error');
-            }
-        });
-    }
-    
-    if(longPauseBtn) {
-        longPauseBtn.addEventListener('click', async () => {
-            try {
-                const res = await api(`/game/pause/${App.game.id}/`, 'POST', {type: 'long'});
-                if(res.ok) {
-                    closeModal('pauseModal');
-                    showNotification('Пауза', 'Длинная пауза активирована (3 минуты)', 'info');
-                }
-            } catch(err) {
-                showNotification('Ошибка', 'Не удалось активировать паузу: ' + err.message, 'error');
-            }
-        });
-    }
-    
-    if(cancelPauseBtn) {
-        cancelPauseBtn.addEventListener('click', () => {
-            closeModal('pauseModal');
-        });
-    }
-    
-    initTabs();
 }
 
 function init() {

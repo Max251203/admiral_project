@@ -1,19 +1,37 @@
-from channels.generic.websocket import AsyncJsonWebsocketConsumer
+import json
+from channels.generic.websocket import AsyncWebsocketConsumer
 
-class LobbyConsumer(AsyncJsonWebsocketConsumer):
+lobby_connections = {}
+
+class LobbyConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        user = self.scope.get("user")
-        if user and user.is_authenticated:
-            self.user_group = f"user_{user.id}"
-            await self.channel_layer.group_add(self.user_group, self.channel_name)
+        self.user = self.scope.get("user")
+        if not self.user or not self.user.is_authenticated:
+            await self.close()
+            return
+        
+        # Убираем использование channel_layer.group_add
+        lobby_connections[self.user.id] = self
         await self.accept()
 
-    async def disconnect(self, code):
-        if hasattr(self, "user_group"):
-            await self.channel_layer.group_discard(self.user_group, self.channel_name)
+    async def disconnect(self, close_code):
+        # Убираем использование channel_layer.group_discard
+        lobby_connections.pop(self.user.id, None)
 
-    async def receive_json(self, content, **kwargs):
-        await self.send_json({"echo": content})
+    async def receive(self, text_data):
+        try:
+            data = json.loads(text_data)
+            message_type = data.get('type')
+            
+            if message_type == 'ping':
+                await self.send(text_data=json.dumps({'type': 'pong'}))
+                
+        except json.JSONDecodeError:
+            pass
 
-    async def notify(self, event):
-        await self.send_json(event["payload"])
+async def notify_user(user_id, message):
+    if user_id in lobby_connections:
+        try:
+            await lobby_connections[user_id].send(text_data=json.dumps(message))
+        except:
+            lobby_connections.pop(user_id, None)

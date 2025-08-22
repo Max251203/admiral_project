@@ -1,7 +1,5 @@
 from django.db import models
 from django.contrib.auth.models import User
-import cloudinary
-from cloudinary.models import CloudinaryField
 
 def avatar_upload_to(instance, filename):
     return f"avatars/{instance.user_id}/{filename}"
@@ -9,8 +7,7 @@ def avatar_upload_to(instance, filename):
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     login = models.CharField(max_length=32, unique=True)
-    avatar = CloudinaryField('avatar', blank=True, null=True, 
-                            transformation={'width': 200, 'height': 200, 'crop': 'fill'})
+    avatar = models.ImageField(upload_to=avatar_upload_to, blank=True, null=True)
     bio = models.CharField(max_length=240, blank=True, default="")
     rating_elo = models.IntegerField(default=1000)
     wins = models.IntegerField(default=0)
@@ -22,7 +19,7 @@ class Profile(models.Model):
     def get_avatar_url(self):
         if self.avatar:
             return self.avatar.url
-        return 'https://res.cloudinary.com/your-cloud-name/image/upload/v1/default-avatar.png'
+        return '/static/img/default-avatar.png'
 
 class Friendship(models.Model):
     PENDING = "pending"

@@ -7,8 +7,5 @@ django-cors-headers
 dj-database-url
 python-dotenv
 channels>=4.0.0
-channels-redis>=4.2.0
 daphne>=4.1.0
-cloudinary>=1.36.0
-django-cloudinary-storage>=0.3.0
 redis>=4.5.0

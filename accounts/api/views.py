@@ -6,18 +6,20 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
-from channels.layers import get_channel_layer
-from asgiref.sync import async_to_sync
+import asyncio
 
 from accounts.models import Profile, Friendship
 from ..serializers import RegisterSerializer
 
-def notify_user(user_id, event_type, data):
-    channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        f"user_{user_id}",
-        {"type": "notify", "payload": {"type": event_type, **data}}
-    )
+def safe_notify_user(user_id, event_type, data):
+    try:
+        from matchmaking.consumers.lobby_consumer import notify_user
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(notify_user(user_id, {"type": event_type, **data}))
+        loop.close()
+    except:
+        pass
 
 class Register(APIView):
     permission_classes = [AllowAny]
@@ -118,7 +120,7 @@ class FriendAdd(APIView):
             
         friendship = Friendship.objects.create(from_user=request.user, to_user=target, status=Friendship.PENDING)
         
-        notify_user(target.id, 'friend_request', {
+        safe_notify_user(target.id, 'friend_request', {
             'from_user': {'id': request.user.id, 'login': request.user.profile.login},
             'request_id': friendship.id
         })
@@ -133,7 +135,7 @@ class FriendRemove(APIView):
             (Q(from_user=request.user, to_user=target) | Q(from_user=target, to_user=request.user))
         ).delete()
         
-        notify_user(target.id, 'friend_removed', {'from_user_id': request.user.id})
+        safe_notify_user(target.id, 'friend_removed', {'from_user_id': request.user.id})
         return Response({"ok": True})
 
 class FriendAccept(APIView):
@@ -144,7 +146,7 @@ class FriendAccept(APIView):
         friend_request.status = Friendship.ACCEPTED
         friend_request.save()
         
-        notify_user(friend_request.from_user.id, 'friend_request_accepted', {
+        safe_notify_user(friend_request.from_user.id, 'friend_request_accepted', {
             'user': {'id': request.user.id, 'login': request.user.profile.login}
         })
         return Response({"ok": True})
@@ -156,7 +158,7 @@ class FriendDecline(APIView):
         friend_request = get_object_or_404(Friendship, id=request_id, to_user=request.user, status=Friendship.PENDING)
         friend_request.delete()
         
-        notify_user(friend_request.from_user.id, 'friend_request_declined', {
+        safe_notify_user(friend_request.from_user.id, 'friend_request_declined', {
             'from_user_login': request.user.profile.login
         })
         return Response({"ok": True})
